@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "AI Video Generator",
+    "slug": "ai-video-generator",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "aivideogen",
+    "platforms": [
+      "android",
+      "ios",
+      "web"
+    ],
+    "android": {
+      "package": "com.licenta.aivideogenerator"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-asset"
+    ]
+  }
+}
