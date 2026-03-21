@@ -1,37 +1,35 @@
 """
-Text-to-Image pipeline — SDXL (JuggernautXL Ragnarok)
+Text-to-image pipeline - SDXL (JuggernautXL Ragnarok)
 
 Reimplements the ComfyUI workflow:
-  LoadCheckpoint → CLIPTextEncode (pos/neg) → EmptyLatentImage → KSampler → VAEDecode
+  LoadCheckpoint -> CLIPTextEncode (pos/neg) -> EmptyLatentImage -> KSampler -> VAEDecode
 
 Settings from workflow:
   - Checkpoint: juggernautXL_ragnarokBy.safetensors
-  - Sampler: dpmpp_2m_sde, scheduler: karras
+  - Sampler: lcm, scheduler: normal
   - Steps: 35, CFG: 3.5, Denoise: 1.0
   - Resolution: 832x1216, Batch: 10
   - Negative prompt: "cartoon, deformed"
 """
 
 import torch
-from diffusers import (
-    StableDiffusionXLPipeline,
-    DPMSolverSDEScheduler,
-)
+from diffusers import LCMScheduler, StableDiffusionXLPipeline
 from PIL import Image
 
 from backend.utils.model_loader import (
-    resolve_model_path,
+    SDXL_CHECKPOINT,
+    SDXL_LORA,
     get_device,
     get_dtype,
-    SDXL_CHECKPOINT,
+    resolve_model_path,
 )
 
 # Pipeline defaults matching the ComfyUI workflow
 DEFAULT_NEGATIVE_PROMPT = "cartoon, deformed"
-DEFAULT_STEPS = 35
-DEFAULT_CFG = 3.5
-DEFAULT_WIDTH = 832
-DEFAULT_HEIGHT = 1216
+DEFAULT_STEPS = 8
+DEFAULT_CFG = 1.4
+DEFAULT_WIDTH = 1024
+DEFAULT_HEIGHT = 1024
 DEFAULT_BATCH_SIZE = 1
 
 _pipeline: StableDiffusionXLPipeline | None = None
@@ -46,6 +44,7 @@ def load_pipeline() -> StableDiffusionXLPipeline:
     device = get_device()
     dtype = get_dtype()
     checkpoint_path = resolve_model_path(SDXL_CHECKPOINT)
+    lora_path = resolve_model_path(SDXL_LORA)
 
     print(f"[T2I] Loading SDXL checkpoint: {checkpoint_path}")
     pipe = StableDiffusionXLPipeline.from_single_file(
@@ -54,22 +53,31 @@ def load_pipeline() -> StableDiffusionXLPipeline:
         use_safetensors=True,
     )
 
-    # Configure the scheduler to match ComfyUI: dpmpp_2m_sde + karras
-    pipe.scheduler = DPMSolverSDEScheduler.from_config(
-        pipe.scheduler.config,
-        use_karras_sigmas=True,
-        noise_sampler_seed=None,
+    # Configure the scheduler to match ComfyUI: lcm + normal
+    pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
+
+    # Mirror the ComfyUI workflow, which applies the same LoRA twice in sequence.
+    print(f"[T2I] Loading SDXL LoRA pass 1: {lora_path}")
+    pipe.load_lora_weights(
+        str(lora_path),
+        adapter_name="dmd2_sdxl_pass_1",
     )
+    print(f"[T2I] Loading SDXL LoRA pass 2: {lora_path}")
+    pipe.load_lora_weights(
+        str(lora_path),
+        adapter_name="dmd2_sdxl_pass_2",
+    )
+    pipe.set_adapters(["dmd2_sdxl_pass_1", "dmd2_sdxl_pass_2"])
 
     pipe = pipe.to(device)
-    pipe.enable_attention_slicing()
 
-    # Use xformers if available for memory efficiency
+    # Prefer xformers when available; attention slicing can slow inference down.
     try:
         pipe.enable_xformers_memory_efficient_attention()
         print("[T2I] xformers memory-efficient attention enabled")
     except Exception:
-        pass
+        pipe.enable_attention_slicing()
+        print("[T2I] Attention slicing enabled")
 
     _pipeline = pipe
     print("[T2I] Pipeline loaded successfully")

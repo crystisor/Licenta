@@ -1,8 +1,8 @@
 """
-Image-to-Video pipeline — Wan 2.2 I2V (14B, FP8)
+Image-to-video pipeline - Wan 2.2 I2V (14B, FP8)
 
 Reimplements the ComfyUI workflow:
-  LoadImage → ImageToVideo(Wan2.2) → SaveVideo
+  LoadImage -> ImageToVideo(Wan2.2) -> SaveVideo
 
 Uses dual-denoiser architecture (high_noise + low_noise transformers)
 with LightX2V 4-step LoRAs for accelerated inference.
@@ -13,25 +13,22 @@ Settings from workflow:
   - Models: FP8 quantized, CLIP: UMT5-XXL
 """
 
+import os
+
 import torch
-from diffusers import (
-    AutoencoderKLWan,
-    WanImageToVideoPipeline,
-    WanTransformer3DModel,
-)
+from diffusers import AutoencoderKLWan, WanImageToVideoPipeline, WanTransformer3DModel
 from diffusers.schedulers.scheduling_unipc_multistep import UniPCMultistepScheduler
 from diffusers.utils import export_to_video
 from PIL import Image
 
 from backend.utils.model_loader import (
-    resolve_model_path,
-    get_device,
     WAN_HIGH_NOISE,
     WAN_LOW_NOISE,
-    WAN_CLIP,
-    WAN_VAE,
     WAN_LORA_HIGH,
     WAN_LORA_LOW,
+    WAN_VAE,
+    get_device,
+    resolve_model_path,
 )
 
 # Pipeline defaults matching the ComfyUI workflow
@@ -58,8 +55,6 @@ def load_pipeline() -> WanImageToVideoPipeline:
     global _pipeline
     if _pipeline is not None:
         return _pipeline
-
-    device = get_device()
 
     # 1. Load VAE (float32 for decoding quality)
     vae_path = resolve_model_path(WAN_VAE)
@@ -95,7 +90,7 @@ def load_pipeline() -> WanImageToVideoPipeline:
         torch_dtype=torch.bfloat16,
     )
 
-    # 5. Configure scheduler — euler with flow shift for turbo mode
+    # 5. Configure scheduler - euler with flow shift for turbo mode
     pipe.scheduler = UniPCMultistepScheduler.from_config(
         pipe.scheduler.config,
         flow_shift=3.0,
@@ -135,6 +130,7 @@ def generate(
     height: int = DEFAULT_HEIGHT,
     num_frames: int = DEFAULT_NUM_FRAMES,
     seed: int | None = None,
+    output_path: str = "output/video.mp4",
 ) -> str:
     """
     Generate a video from an image + motion prompt.
@@ -146,13 +142,13 @@ def generate(
         height: Output video height.
         num_frames: Number of frames (must follow 4*k+1 formula).
         seed: Optional random seed for reproducibility.
+        output_path: Destination path for the generated video.
 
     Returns:
         Path to the generated video file.
     """
     pipe = load_pipeline()
 
-    # Resize input image to target dimensions
     image_resized = image.resize((width, height), Image.LANCZOS)
 
     generator = None
@@ -162,22 +158,20 @@ def generate(
     print(f"[I2V] Generating {num_frames} frames at {width}x{height}")
     print(f"[I2V] Prompt: '{prompt[:80]}...'")
 
-    result = pipe(
-        image=image_resized,
-        prompt=prompt,
-        height=height,
-        width=width,
-        num_frames=num_frames,
-        guidance_scale=5.0,
-        generator=generator,
-    )
+    with torch.inference_mode():
+        result = pipe(
+            image=image_resized,
+            prompt=prompt,
+            height=height,
+            width=width,
+            num_frames=num_frames,
+            guidance_scale=5.0,
+            generator=generator,
+        )
 
     frames = result.frames[0]
 
-    # Export to video file
-    output_path = "output/video.mp4"
-    import os
-    os.makedirs("output", exist_ok=True)
+    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
     export_to_video(frames, output_path, fps=DEFAULT_FPS)
 
     print(f"[I2V] Video saved to {output_path}")

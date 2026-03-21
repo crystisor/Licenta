@@ -30,7 +30,7 @@ export async function generateFull(
   motionPrompt?: string,
   imageIndex: number = 0
 ): Promise<FullGenerateResponse> {
-  const res = await fetch(`${API_BASE}/generate`, {
+  const res = await fetch(`${API_BASE}/generate/full`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -53,7 +53,7 @@ export async function generateFull(
  */
 export async function generateImages(
   prompt: string,
-  numImages: number = 10
+  numImages: number = 1
 ): Promise<ImageGenerateResponse> {
   const res = await fetch(`${API_BASE}/generate/image`, {
     method: "POST",

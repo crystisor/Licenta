@@ -1,17 +1,16 @@
-import os
+from functools import lru_cache
 from pathlib import Path
 
 import torch
 from safetensors.torch import load_file
+from backend.config import get_models_dir
 
 # Base directory for all model weights
-MODELS_DIR = Path(os.environ.get(
-    "MODELS_DIR",
-    "/home/rheinsystems1/Desktop/AI/Comfyui/ComfyUI/models"
-))
+MODELS_DIR = get_models_dir()
 
 # --- Text-to-Image model paths (relative to MODELS_DIR) ---
 SDXL_CHECKPOINT = "checkpoints/juggernautXL_ragnarokBy.safetensors"
+SDXL_LORA = "loras/dmd2_sdxl_4step_lora.safetensors"
 
 # --- Image-to-Video model paths (relative to MODELS_DIR) ---
 WAN_HIGH_NOISE = "diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors"
@@ -22,16 +21,17 @@ WAN_LORA_HIGH = "loras/wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors
 WAN_LORA_LOW = "loras/wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors"
 
 
+@lru_cache(maxsize=None)
 def resolve_model_path(relative_path: str) -> Path:
     """Resolve a model path relative to MODELS_DIR, fallback to recursive search."""
-    # Try the exact relative path first
     full_path = MODELS_DIR / relative_path
     if full_path.exists():
         return full_path
-    # Fallback: search by filename only
+
     filename = Path(relative_path).name
     for path in MODELS_DIR.rglob(filename):
         return path
+
     raise FileNotFoundError(
         f"Model '{relative_path}' not found in {MODELS_DIR}. "
         f"Expected at: {full_path}"

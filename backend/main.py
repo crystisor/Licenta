@@ -2,25 +2,26 @@
 FastAPI backend server for the AI Video Generator.
 
 Endpoints:
-  POST /generate          — Full pipeline: prompt → image → video
-  POST /generate/image    — Text-to-image only
-  POST /generate/video    — Image-to-video only (accepts image upload)
-  GET  /output/{filename} — Serve generated files
+  POST /generate          - Text-to-image only
+  POST /generate/full     - Full pipeline: prompt -> image -> video
+  POST /generate/image    - Text-to-image only (compat route)
+  POST /generate/video    - Image-to-video only (accepts image upload)
+  GET  /output/{filename} - Serve generated files
 """
 
 import io
-import os
 import traceback
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel
 from PIL import Image
+from pydantic import BaseModel
 
-from backend.pipelines import text_to_image, image_to_video
+from backend.pipelines import image_to_video, text_to_image
 
 app = FastAPI(title="AI Video Generator")
 
@@ -43,6 +44,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": str(exc), "traceback": tb},
     )
 
+
 OUTPUT_DIR = Path("output")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
@@ -51,7 +53,7 @@ class GenerateRequest(BaseModel):
     prompt: str
     negative_prompt: str = "cartoon, deformed"
     motion_prompt: str | None = None
-    num_images: int = 10
+    num_images: int = 1
     image_index: int = 0  # Which of the batch images to use for video
     seed: int | None = None
 
@@ -59,7 +61,7 @@ class GenerateRequest(BaseModel):
 class GenerateImageRequest(BaseModel):
     prompt: str
     negative_prompt: str = "cartoon, deformed"
-    num_images: int = 10
+    num_images: int = 1
     seed: int | None = None
 
 
@@ -76,10 +78,8 @@ class FullResponse(BaseModel):
     video_url: str
 
 
-@app.post("/generate", response_model=FullResponse)
-async def generate_full(req: GenerateRequest):
-    """Full pipeline: text → images → select one → video."""
-    # Step 1: Generate images
+def _generate_full_sync(req: GenerateRequest) -> FullResponse:
+    """Run the full prompt -> image -> video pipeline off the event loop."""
     images = text_to_image.generate(
         prompt=req.prompt,
         negative_prompt=req.negative_prompt,
@@ -87,7 +87,6 @@ async def generate_full(req: GenerateRequest):
         seed=req.seed,
     )
 
-    # Save all images
     image_filenames = []
     batch_id = uuid.uuid4().hex[:8]
     for i, img in enumerate(images):
@@ -95,30 +94,20 @@ async def generate_full(req: GenerateRequest):
         img.save(OUTPUT_DIR / filename)
         image_filenames.append(filename)
 
-    # Step 2: Unload T2I to free VRAM for I2V
+    # Free VRAM before switching to the heavier I2V pipeline.
     text_to_image.unload_pipeline()
 
-    # Step 3: Select image for video
     idx = max(0, min(req.image_index, len(images) - 1))
     selected_image = images[idx]
 
-    # Step 4: Generate video
-    motion_prompt = req.motion_prompt or req.prompt
     video_filename = f"{batch_id}_video.mp4"
-    video_path = str(OUTPUT_DIR / video_filename)
-
-    # Temporarily patch the output path
-    result_path = image_to_video.generate(
+    image_to_video.generate(
         image=selected_image,
-        prompt=motion_prompt,
+        prompt=req.motion_prompt or req.prompt,
         seed=req.seed,
+        output_path=str(OUTPUT_DIR / video_filename),
     )
 
-    # Move/rename to our output dir if needed
-    if result_path != video_path:
-        os.rename(result_path, video_path)
-
-    # Unload I2V to free VRAM
     image_to_video.unload_pipeline()
 
     return FullResponse(
@@ -127,9 +116,8 @@ async def generate_full(req: GenerateRequest):
     )
 
 
-@app.post("/generate/image", response_model=ImageResponse)
-async def generate_image(req: GenerateImageRequest):
-    """Generate images from a text prompt."""
+def _generate_image_sync(req: GenerateImageRequest) -> ImageResponse:
+    """Run text-to-image generation off the event loop."""
     images = text_to_image.generate(
         prompt=req.prompt,
         negative_prompt=req.negative_prompt,
@@ -147,6 +135,41 @@ async def generate_image(req: GenerateImageRequest):
     return ImageResponse(image_urls=[f"/output/{f}" for f in filenames])
 
 
+def _generate_video_sync(
+    pil_image: Image.Image,
+    prompt: str,
+    seed: int | None,
+) -> VideoResponse:
+    """Run image-to-video generation off the event loop."""
+    video_filename = f"{uuid.uuid4().hex[:8]}_video.mp4"
+    image_to_video.generate(
+        image=pil_image,
+        prompt=prompt,
+        seed=seed,
+        output_path=str(OUTPUT_DIR / video_filename),
+    )
+
+    return VideoResponse(video_url=f"/output/{video_filename}")
+
+
+@app.post("/generate", response_model=ImageResponse)
+async def generate(req: GenerateImageRequest):
+    """Generate images from a text prompt."""
+    return await run_in_threadpool(_generate_image_sync, req)
+
+
+@app.post("/generate/full", response_model=FullResponse)
+async def generate_full(req: GenerateRequest):
+    """Full pipeline: text -> images -> select one -> video."""
+    return await run_in_threadpool(_generate_full_sync, req)
+
+
+@app.post("/generate/image", response_model=ImageResponse)
+async def generate_image(req: GenerateImageRequest):
+    """Generate images from a text prompt."""
+    return await run_in_threadpool(_generate_image_sync, req)
+
+
 @app.post("/generate/video", response_model=VideoResponse)
 async def generate_video(
     image: UploadFile = File(...),
@@ -156,19 +179,7 @@ async def generate_video(
     """Generate video from an uploaded image + motion prompt."""
     image_data = await image.read()
     pil_image = Image.open(io.BytesIO(image_data)).convert("RGB")
-
-    video_filename = f"{uuid.uuid4().hex[:8]}_video.mp4"
-    result_path = image_to_video.generate(
-        image=pil_image,
-        prompt=prompt,
-        seed=seed,
-    )
-
-    target_path = str(OUTPUT_DIR / video_filename)
-    if result_path != target_path:
-        os.rename(result_path, target_path)
-
-    return VideoResponse(video_url=f"/output/{video_filename}")
+    return await run_in_threadpool(_generate_video_sync, pil_image, prompt, seed)
 
 
 @app.get("/output/{filename}")
