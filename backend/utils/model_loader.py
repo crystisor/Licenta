@@ -11,6 +11,7 @@ MODELS_DIR = get_models_dir()
 # --- Text-to-Image model paths (relative to MODELS_DIR) ---
 SDXL_CHECKPOINT = "checkpoints/juggernautXL_ragnarokBy.safetensors"
 SDXL_LORA = "loras/dmd2_sdxl_4step_lora.safetensors"
+SDXL_LORA_FP16 = "loras/dmd2_sdxl_4step_lora_fp16.safetensors"
 
 # --- Image-to-Video model paths (relative to MODELS_DIR) ---
 WAN_HIGH_NOISE = "diffusion_models/wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors"
