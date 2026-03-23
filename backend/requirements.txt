@@ -15,4 +15,4 @@ peft>=0.10.0
 sentencepiece>=0.2.0
 xformers>=0.0.23
 httpx>=0.27.0
-comfyscript>=1.0.0
+

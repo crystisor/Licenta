@@ -12,7 +12,7 @@ interface SummonScreenProps {
   debugPanel?: ReactNode;
 }
 
-const STATUS_PILLS = ['ex.py pipeline', 'Single image', 'Expo client'];
+const STATUS_PILLS: string[] = [];
 
 export function SummonScreen({
   prompt,
@@ -23,9 +23,9 @@ export function SummonScreen({
 }: SummonScreenProps) {
   return (
     <ScreenShell
-      eyebrow="Digital Alchemist"
-      title="Conjure a cinematic image from text"
-      subtitle="Describe the subject, scene, and style you want, and the backend will call the ex.py image pipeline to render a single image."
+      eyebrow="AI Cards"
+      title="Generate fantasy character cards"
+      subtitle="Describe your character — race, class, gear, and lore — and the AI will craft a unique fantasy card illustration for you."
       footer={<Text style={styles.footer}>Powered by Expo on the client and FastAPI on the backend.</Text>}
     >
       <KeyboardAvoidingView

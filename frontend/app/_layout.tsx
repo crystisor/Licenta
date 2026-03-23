@@ -12,7 +12,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: "#0f0f23" },
         }}
       >
-        <Stack.Screen name="index" options={{ title: "AI Video Generator" }} />
+        <Stack.Screen name="index" options={{ title: "AI Cards" }} />
       </Stack>
     </>
   );
