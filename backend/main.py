@@ -169,7 +169,7 @@ def _generate_video_sync(
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
-@app.post("/generate/image", response_model=ImageResponse)
+@app.post("/generate/ex-image", response_model=ImageResponse)
 async def generate_image(req: GenerateImageRequest):
     """Generate an image from a text prompt via ComfyUI."""
     return await run_in_threadpool(_generate_image_comfy, req)

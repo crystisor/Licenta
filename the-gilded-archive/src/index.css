@@ -1,0 +1,49 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;700&family=Newsreader:ital,wght@0,400;0,600;1,400&family=Work+Sans:wght@400;500;600&display=swap');
+
+@theme {
+  --font-headline: "Noto Serif", serif;
+  --font-body: "Newsreader", serif;
+  --font-label: "Work Sans", sans-serif;
+
+  --color-primary: #e9c349;
+  --color-on-primary: #3c2f00;
+  --color-primary-container: #211900;
+  --color-on-primary-container: #9f7f00;
+  
+  --color-surface: #131313;
+  --color-surface-dim: #131313;
+  --color-surface-bright: #393939;
+  --color-surface-container-lowest: #0e0e0e;
+  --color-surface-container-low: #1c1b1b;
+  --color-surface-container: #201f1f;
+  --color-surface-container-high: #2a2a2a;
+  --color-surface-container-highest: #353534;
+
+  --color-on-surface: #e5e2e1;
+  --color-on-surface-variant: #c5c6cc;
+  
+  --color-outline: #8f9096;
+  --color-outline-variant: #45474c;
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface font-body selection:bg-primary/30;
+  }
+}
+
+@layer components {
+  .ornate-border {
+    border: 2px solid transparent;
+    border-image: linear-gradient(to bottom, #e9c349, #9f7f00) 1;
+  }
+  
+  .card-shadow {
+    box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 20px rgba(233,195,73,0.1);
+  }
+
+  .sunken-panel {
+    @apply bg-surface-container-lowest shadow-inner border border-white/5;
+  }
+}

@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Easing,
   Image,
   ImageErrorEventData,
   NativeSyntheticEvent,
@@ -54,19 +55,72 @@ export function ResultScreen({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
+  // Card flip animation: 3 full rotations (0° → 1080°) then push-in scale
+  const flipAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.7)).current;
+  const cardFaceOpacity = useRef(new Animated.Value(0)).current;
+
+  const flipInterpolate = flipAnim.interpolate({
+    inputRange: [0, 1080],
+    outputRange: ['0deg', '1080deg'],
+  });
+
+  // Card back color fades out as the flip progresses
+  const cardBackOpacity = flipAnim.interpolate({
+    inputRange: [0, 900, 1080],
+    outputRange: [1, 1, 0],
+  });
+
   useEffect(() => {
+    // Fade + slide in the page, start flipping immediately
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 500,
+        duration: 400,
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 500,
+        duration: 400,
         useNativeDriver: true,
       }),
-    ]).start();
+      // 3 full flips
+      Animated.timing(flipAnim, {
+        toValue: 1080,
+        duration: 2400,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      // Scale up during the flip
+      Animated.timing(scaleAnim, {
+        toValue: 0.95,
+        duration: 2400,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      // Reveal the card face content
+      Animated.timing(cardFaceOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+
+      // Push into screen: scale 0.95 → 1.05 → 1.0
+      Animated.sequence([
+        Animated.spring(scaleAnim, {
+          toValue: 1.05,
+          friction: 6,
+          tension: 80,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 10,
+          tension: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
   }, []);
 
   const handleImageLoad = () => {
@@ -108,45 +162,51 @@ export function ResultScreen({
             ]}
           >
             {/* ── Portrait Card ── */}
-            <View style={styles.card}>
-              {/* Decorative inner border */}
-              <View style={styles.innerBorder} pointerEvents="none" />
+            <Animated.View style={[styles.card, { transform: [{ perspective: 1000 }, { rotateY: flipInterpolate }, { scale: scaleAnim }] }]}>
+              {/* Card back — solid surface visible during flips, fades out at the end */}
+              <Animated.View style={[styles.cardBack, { opacity: cardBackOpacity }]} pointerEvents="none" />
 
-              {/* Portrait image */}
-              <View style={styles.portraitContainer}>
-                <Image
-                  source={{ uri: result.imageUrl }}
-                  style={styles.portraitImage}
-                  resizeMode="cover"
-                  onLoad={handleImageLoad}
-                  onError={handleImageError}
-                />
-                {/* Overlay tint */}
-                <View style={styles.portraitOverlay} />
-                {/* Loading indicator */}
-                {!imageLoaded && (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator
-                      size="large"
-                      color={theme.colors.primary}
-                    />
-                  </View>
-                )}
-              </View>
+              {/* Card face — hidden during flips, revealed after */}
+              <Animated.View style={{ opacity: cardFaceOpacity }}>
+                {/* Decorative inner border */}
+                <View style={styles.innerBorder} pointerEvents="none" />
 
-              {/* Title banner */}
-              <View style={styles.bannerWrapper}>
-                <View style={styles.banner}>
-                  <Text style={styles.bannerText}>{meta.title}</Text>
+                {/* Portrait image */}
+                <View style={styles.portraitContainer}>
+                  <Image
+                    source={{ uri: result.imageUrl }}
+                    style={styles.portraitImage}
+                    resizeMode="cover"
+                    onLoad={handleImageLoad}
+                    onError={handleImageError}
+                  />
+                  {/* Overlay tint */}
+                  <View style={styles.portraitOverlay} />
+                  {/* Loading indicator */}
+                  {!imageLoaded && (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator
+                        size="large"
+                        color={theme.colors.primary}
+                      />
+                    </View>
+                  )}
                 </View>
-              </View>
 
-              {/* Description */}
-              <View style={styles.descriptionContainer}>
-                <Text style={styles.descriptionLabel}>Description:</Text>
-                <Text style={styles.descriptionText}>{meta.description}</Text>
-              </View>
-            </View>
+                {/* Title banner */}
+                <View style={styles.bannerWrapper}>
+                  <View style={styles.banner}>
+                    <Text style={styles.bannerText}>{meta.title}</Text>
+                  </View>
+                </View>
+
+                {/* Description */}
+                <View style={styles.descriptionContainer}>
+                  <Text style={styles.descriptionLabel}>Description:</Text>
+                  <Text style={styles.descriptionText}>{meta.description}</Text>
+                </View>
+              </Animated.View>
+            </Animated.View>
 
             {/* ── Stats Grid ── */}
             <View style={styles.statsCard}>
@@ -226,6 +286,14 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
     gap: 18,
+  },
+
+  // ── Card Back (visible during flip) ──
+  cardBack: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.lg - 1,
+    zIndex: 10,
   },
 
   // ── Portrait Card ──
