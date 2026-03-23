@@ -85,6 +85,12 @@ class ImageResponse(BaseModel):
     image_urls: list[str]
 
 
+class AnimateRequest(BaseModel):
+    image_filename: str
+    prompt: str
+    seed: int | None = None
+
+
 class VideoResponse(BaseModel):
     video_url: str
 
@@ -185,6 +191,16 @@ async def generate_video(
     image_data = await image.read()
     pil_image = Image.open(io.BytesIO(image_data)).convert("RGB")
     return await run_in_threadpool(_generate_video_sync, pil_image, prompt, seed)
+
+
+@app.post("/generate/animate", response_model=VideoResponse)
+async def animate_image(req: AnimateRequest):
+    """Animate a previously generated image using the I2V pipeline."""
+    image_path = OUTPUT_DIR / req.image_filename
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail=f"Image '{req.image_filename}' not found in output directory.")
+    pil_image = Image.open(image_path).convert("RGB")
+    return await run_in_threadpool(_generate_video_sync, pil_image, req.prompt, req.seed)
 
 
 @app.get("/output/{filename}")

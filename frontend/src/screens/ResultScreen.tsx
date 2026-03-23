@@ -10,8 +10,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -36,6 +38,9 @@ const MOCK_META: ImageMeta = {
 interface ResultScreenProps {
   result: GeneratedImage;
   onReset: () => void;
+  onAnimate: (motionPrompt: string) => void;
+  isAnimating?: boolean;
+  videoUrl?: string | null;
   onImageLoad?: () => void;
   onImageError?: (message: string) => void;
   debugPanel?: ReactNode;
@@ -44,12 +49,16 @@ interface ResultScreenProps {
 export function ResultScreen({
   result,
   onReset,
+  onAnimate,
+  isAnimating = false,
+  videoUrl = null,
   onImageLoad,
   onImageError,
   debugPanel,
 }: ResultScreenProps) {
   const imageSettledRef = useRef(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [motionPrompt, setMotionPrompt] = useState('');
 
   // Entrance animation
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -248,6 +257,57 @@ export function ResultScreen({
               <Text style={styles.promptLabel}>Original Prompt</Text>
               <Text style={styles.promptText}>{result.prompt}</Text>
             </View>
+
+            {/* ── Animate Section ── */}
+            <View style={styles.animateCard}>
+              <Text style={styles.animateTitle}>Animate</Text>
+              <Text style={styles.animateSubtitle}>Bring this image to life</Text>
+              <TextInput
+                style={styles.motionInput}
+                placeholder="Describe the motion (e.g. camera slowly zooms in, wind blows hair...)"
+                placeholderTextColor={theme.colors.textMuted}
+                value={motionPrompt}
+                onChangeText={setMotionPrompt}
+                multiline
+                numberOfLines={3}
+                editable={!isAnimating}
+              />
+              <Pressable
+                onPress={() => onAnimate(motionPrompt)}
+                disabled={isAnimating || !motionPrompt.trim()}
+                style={({ pressed }) => [
+                  styles.animateButton,
+                  pressed && styles.animateButtonPressed,
+                  (isAnimating || !motionPrompt.trim()) && styles.animateButtonDisabled,
+                ]}
+              >
+                {isAnimating ? (
+                  <View style={styles.animateButtonContent}>
+                    <ActivityIndicator size="small" color={theme.colors.text} />
+                    <Text style={styles.animateButtonText}>Animating...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.animateButtonText}>Animate</Text>
+                )}
+              </Pressable>
+            </View>
+
+            {/* ── Video Player ── */}
+            {videoUrl && (
+              <View style={styles.videoCard}>
+                <Text style={styles.videoTitle}>Generated Video</Text>
+                <View style={styles.videoContainer}>
+                  <Video
+                    source={{ uri: videoUrl }}
+                    style={styles.videoPlayer}
+                    useNativeControls
+                    resizeMode={ResizeMode.CONTAIN}
+                    isLooping
+                    shouldPlay
+                  />
+                </View>
+              </View>
+            )}
 
             {/* ── Action Button ── */}
             <Pressable
@@ -512,5 +572,96 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1,
     textTransform: 'uppercase',
+  },
+
+  // ── Animate Section ──
+  animateCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.panelBorder,
+    padding: 20,
+    gap: 12,
+  },
+  animateTitle: {
+    color: theme.colors.primary,
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+  animateSubtitle: {
+    color: theme.colors.textMuted,
+    fontSize: 10,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    opacity: 0.6,
+    marginTop: -8,
+  },
+  motionInput: {
+    backgroundColor: theme.colors.panel,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(111, 119, 203, 0.2)',
+    color: theme.colors.text,
+    fontSize: 14,
+    lineHeight: 20,
+    padding: 14,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  animateButton: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.md,
+    backgroundColor: theme.colors.primaryStrong,
+  },
+  animateButtonPressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.9,
+  },
+  animateButtonDisabled: {
+    opacity: 0.4,
+  },
+  animateButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  animateButtonText: {
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+
+  // ── Video Player ──
+  videoCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.colors.panelBorder,
+    padding: 20,
+    gap: 12,
+  },
+  videoTitle: {
+    color: theme.colors.primary,
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+  videoContainer: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: theme.radius.sm,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.panel,
+  },
+  videoPlayer: {
+    width: '100%',
+    height: '100%',
   },
 });

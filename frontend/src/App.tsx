@@ -14,7 +14,7 @@ import { DebugTracePanel } from './components/DebugTracePanel';
 import { LoadingScreen } from './screens/LoadingScreen';
 import { ResultScreen } from './screens/ResultScreen';
 import { SummonScreen } from './screens/SummonScreen';
-import { EX_IMAGE_ENDPOINT, generateImage, ImageGenerationError } from './services/api';
+import { animateImage, EX_IMAGE_ENDPOINT, generateImage, ImageGenerationError } from './services/api';
 import { DebugTraceRecord, GeneratedImage, Screen } from './types';
 
 const MIN_LOADING_MS = 1400;
@@ -30,6 +30,8 @@ export default function App() {
   const [result, setResult] = useState<GeneratedImage | null>(null);
   const [prompt, setPrompt] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [currentTrace, setCurrentTrace] = useState<DebugTraceRecord | null>(null);
   const [recentTraces, setRecentTraces] = useState<DebugTraceRecord[]>([]);
 
@@ -129,10 +131,32 @@ export default function App() {
     }
   }, [mergeTraceEvents, prompt, recordTraceEvent, startTrace]);
 
+  const handleAnimate = useCallback(async (motionPrompt: string) => {
+    if (!result || !motionPrompt.trim()) return;
+
+    const imageFilename = result.imageUrl.split('/').pop();
+    if (!imageFilename) return;
+
+    const requestId = createRequestId();
+    setIsAnimating(true);
+
+    try {
+      const videoResult = await animateImage(imageFilename, motionPrompt.trim(), requestId);
+      setVideoUrl(videoResult.videoUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Animation failed.';
+      setErrorMessage(message);
+    } finally {
+      setIsAnimating(false);
+    }
+  }, [result]);
+
   const handleReset = useCallback(() => {
     setResult(null);
     setPrompt('');
     setErrorMessage(null);
+    setVideoUrl(null);
+    setIsAnimating(false);
     setScreen('summon');
   }, []);
 
@@ -156,12 +180,15 @@ export default function App() {
       {screen === 'result' && result && (
         <ResultScreen
           debugPanel={debugPanel}
+          isAnimating={isAnimating}
+          onAnimate={handleAnimate}
           onImageError={(message) => recordTraceEvent('image_render_failed', 'error', message)}
           onImageLoad={() => recordTraceEvent('image_render_succeeded', 'completed', {
             requestId: result.requestId,
           })}
           onReset={handleReset}
           result={result}
+          videoUrl={videoUrl}
         />
       )}
     </SafeAreaProvider>

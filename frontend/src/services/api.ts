@@ -2,9 +2,19 @@ import { extractTraceEventsFromHeader, getDebugTraceHeaderName } from '../debugF
 import { DebugTraceEvent, GeneratedImage } from '../types';
 
 export const EX_IMAGE_ENDPOINT = '/generate/ex-image';
+export const ANIMATE_ENDPOINT = '/generate/animate';
 
 interface ImageResponsePayload {
   image_urls: string[];
+}
+
+interface VideoResponsePayload {
+  video_url: string;
+}
+
+export interface GenerateVideoResult {
+  videoUrl: string;
+  requestId: string;
 }
 
 export class ImageGenerationError extends Error {
@@ -95,5 +105,47 @@ export async function generateImage(prompt: string, requestId: string): Promise<
     imageUrl: toAbsoluteUrl(payload.image_urls[0]),
     requestId: resolvedRequestId,
     backendTraceEvents,
+  };
+}
+
+export async function animateImage(
+  imageFilename: string,
+  motionPrompt: string,
+  requestId: string,
+): Promise<GenerateVideoResult> {
+  const response = await fetch(`${getApiBaseUrl()}${ANIMATE_ENDPOINT}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Request-ID': requestId,
+    },
+    body: JSON.stringify({
+      image_filename: imageFilename,
+      prompt: motionPrompt,
+    }),
+  });
+
+  let payload: VideoResponsePayload | { detail?: string } | null = null;
+  try {
+    payload = (await response.json()) as VideoResponsePayload | { detail?: string };
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      (payload && 'detail' in payload && typeof payload.detail === 'string')
+        ? payload.detail
+        : 'Video generation failed.',
+    );
+  }
+
+  if (!payload || !('video_url' in payload) || !payload.video_url) {
+    throw new Error('The backend did not return a generated video.');
+  }
+
+  return {
+    videoUrl: toAbsoluteUrl(payload.video_url),
+    requestId,
   };
 }
