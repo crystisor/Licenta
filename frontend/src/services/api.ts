@@ -1,50 +1,99 @@
-import { Platform } from "react-native";
+import { extractTraceEventsFromHeader, getDebugTraceHeaderName } from '../debugFlow';
+import { DebugTraceEvent, GeneratedImage } from '../types';
 
-const DEFAULT_API_URL = Platform.select({
-  web: "http://localhost:8001",
-  android: "http://10.0.2.2:8001",
-  default: "http://localhost:8001",
-});
+export const EX_IMAGE_ENDPOINT = '/generate/ex-image';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL;
-
-export interface ImageGenerateResponse {
+interface ImageResponsePayload {
   image_urls: string[];
 }
 
-export interface VideoGenerateResponse {
-  video_url: string;
+export class ImageGenerationError extends Error {
+  requestId: string;
+  traceEvents: DebugTraceEvent[];
+  statusCode: number;
+
+  constructor(message: string, requestId: string, traceEvents: DebugTraceEvent[], statusCode: number) {
+    super(message);
+    this.name = 'ImageGenerationError';
+    this.requestId = requestId;
+    this.traceEvents = traceEvents;
+    this.statusCode = statusCode;
+  }
 }
 
-/**
- * Generate an image from a text prompt via ComfyUI.
- */
-export async function generateImage(
-  prompt: string,
-  negativePrompt?: string,
-  seed?: number
-): Promise<ImageGenerateResponse> {
-  const res = await fetch(`${API_BASE}/generate/image`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      prompt,
-      ...(negativePrompt ? { negative_prompt: negativePrompt } : {}),
-      ...(seed !== undefined ? { seed } : {}),
-    }),
-  });
+export interface GenerateImageResult extends GeneratedImage {
+  backendTraceEvents: DebugTraceEvent[];
+}
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Image generation failed: ${err}`);
+function getApiBaseUrl(): string {
+  const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  if (!apiBaseUrl) {
+    throw new Error('Missing EXPO_PUBLIC_API_BASE_URL in the Expo frontend.');
+  }
+  return apiBaseUrl.replace(/\/+$/, '');
+}
+
+function getErrorMessage(payload: unknown): string {
+  if (payload && typeof payload === 'object' && 'detail' in payload) {
+    const detail = payload.detail;
+    if (typeof detail === 'string' && detail.trim()) {
+      return detail;
+    }
+  }
+  return 'The backend could not complete the image generation request.';
+}
+
+function toAbsoluteUrl(pathOrUrl: string): string {
+  if (/^https?:\/\//i.test(pathOrUrl)) {
+    return pathOrUrl;
   }
 
-  return res.json();
+  return `${getApiBaseUrl()}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
 }
 
-/**
- * Convert a relative path to an absolute URL for display.
- */
-export function getMediaUrl(relativePath: string): string {
-  return `${API_BASE}${relativePath}`;
+export async function generateImage(prompt: string, requestId: string): Promise<GenerateImageResult> {
+  const response = await fetch(`${getApiBaseUrl()}${EX_IMAGE_ENDPOINT}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Request-ID': requestId,
+    },
+    body: JSON.stringify({ prompt }),
+  });
+  const resolvedRequestId = response.headers.get('X-Request-ID')?.trim() || requestId;
+  const backendTraceEvents = extractTraceEventsFromHeader(
+    response.headers.get(getDebugTraceHeaderName()),
+  );
+
+  let payload: ImageResponsePayload | { detail?: string } | null = null;
+  try {
+    payload = (await response.json()) as ImageResponsePayload | { detail?: string };
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    throw new ImageGenerationError(
+      getErrorMessage(payload),
+      resolvedRequestId,
+      backendTraceEvents,
+      response.status,
+    );
+  }
+
+  if (!payload || !('image_urls' in payload) || !Array.isArray(payload.image_urls) || payload.image_urls.length === 0) {
+    throw new ImageGenerationError(
+      'The backend did not return a generated image.',
+      resolvedRequestId,
+      backendTraceEvents,
+      response.status,
+    );
+  }
+
+  return {
+    prompt,
+    imageUrl: toAbsoluteUrl(payload.image_urls[0]),
+    requestId: resolvedRequestId,
+    backendTraceEvents,
+  };
 }

@@ -1,21 +1,20 @@
 {
   "expo": {
-    "name": "AI Video Generator",
-    "slug": "ai-video-generator",
+    "name": "Digital Alchemist",
+    "slug": "digital-alchemist",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "aivideogen",
     "platforms": [
       "android",
       "ios",
       "web"
     ],
+    "userInterfaceStyle": "dark",
     "android": {
-      "package": "com.licenta.aivideogenerator"
+      "package": "com.licenta.digitalalchemist"
     },
-    "plugins": [
-      "expo-router",
-      "expo-asset"
-    ]
+    "ios": {
+      "bundleIdentifier": "com.licenta.digitalalchemist"
+    }
   }
 }
