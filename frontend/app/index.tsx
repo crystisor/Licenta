@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -10,36 +10,28 @@ import {
   StyleSheet,
   Dimensions,
 } from "react-native";
-import { Video, ResizeMode } from "expo-av";
-import { generateFull, getMediaUrl, FullGenerateResponse } from "../src/services/api";
+import { generateImage, getMediaUrl, ImageGenerateResponse } from "../src/services/api";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const IMAGE_SIZE = (SCREEN_WIDTH - 48) / 2;
 
-type Stage = "idle" | "generating_images" | "generating_video" | "done" | "error";
+type Stage = "idle" | "generating" | "done" | "error";
 
 export default function HomeScreen() {
   const [prompt, setPrompt] = useState("");
-  const [motionPrompt, setMotionPrompt] = useState("");
   const [stage, setStage] = useState<Stage>("idle");
-  const [result, setResult] = useState<FullGenerateResponse | null>(null);
-  const [selectedImage, setSelectedImage] = useState(0);
+  const [result, setResult] = useState<ImageGenerateResponse | null>(null);
   const [error, setError] = useState("");
-  const videoRef = useRef<Video>(null);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
 
-    setStage("generating_images");
+    setStage("generating");
     setError("");
     setResult(null);
 
     try {
-      const response = await generateFull(
-        prompt.trim(),
-        motionPrompt.trim() || undefined,
-        selectedImage
-      );
+      const response = await generateImage(prompt.trim());
       setResult(response);
       setStage("done");
     } catch (err: any) {
@@ -48,13 +40,7 @@ export default function HomeScreen() {
     }
   };
 
-  const stageLabel: Record<Stage, string> = {
-    idle: "",
-    generating_images: "Generating images...",
-    generating_video: "Creating video...",
-    done: "Done!",
-    error: "Error",
-  };
+  const isLoading = stage === "generating";
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -70,36 +56,22 @@ export default function HomeScreen() {
         numberOfLines={3}
       />
 
-      {/* Motion prompt input */}
-      <Text style={styles.label}>Motion Prompt (optional)</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Describe camera movement, motion..."
-        placeholderTextColor="#666"
-        value={motionPrompt}
-        onChangeText={setMotionPrompt}
-        multiline
-        numberOfLines={2}
-      />
-
       {/* Generate button */}
       <TouchableOpacity
-        style={[styles.button, stage !== "idle" && stage !== "done" && stage !== "error" && styles.buttonDisabled]}
+        style={[styles.button, isLoading && styles.buttonDisabled]}
         onPress={handleGenerate}
-        disabled={stage !== "idle" && stage !== "done" && stage !== "error"}
+        disabled={isLoading}
       >
         <Text style={styles.buttonText}>
-          {stage === "idle" || stage === "done" || stage === "error"
-            ? "Generate"
-            : stageLabel[stage]}
+          {isLoading ? "Generating..." : "Generate"}
         </Text>
       </TouchableOpacity>
 
       {/* Loading indicator */}
-      {(stage === "generating_images" || stage === "generating_video") && (
+      {isLoading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#7c5cff" />
-          <Text style={styles.loadingText}>{stageLabel[stage]}</Text>
+          <Text style={styles.loadingText}>Generating image...</Text>
           <Text style={styles.loadingSubtext}>This may take a few minutes</Text>
         </View>
       )}
@@ -111,52 +83,21 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Results */}
+      {/* Generated images */}
       {result && (
         <>
-          {/* Generated images grid */}
           <Text style={styles.sectionTitle}>Generated Images</Text>
           <View style={styles.imageGrid}>
             {result.image_urls.map((url, i) => (
-              <TouchableOpacity
-                key={i}
-                onPress={() => setSelectedImage(i)}
-                style={[
-                  styles.imageWrapper,
-                  selectedImage === i && styles.imageSelected,
-                ]}
-              >
+              <View key={i} style={styles.imageWrapper}>
                 <Image
                   source={{ uri: getMediaUrl(url) }}
                   style={styles.gridImage}
                   resizeMode="cover"
                 />
-                {selectedImage === i && (
-                  <View style={styles.selectedBadge}>
-                    <Text style={styles.selectedBadgeText}>Selected</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+              </View>
             ))}
           </View>
-
-          {/* Generated video */}
-          {result.video_url && (
-            <>
-              <Text style={styles.sectionTitle}>Generated Video</Text>
-              <View style={styles.videoContainer}>
-                <Video
-                  ref={videoRef}
-                  source={{ uri: getMediaUrl(result.video_url) }}
-                  style={styles.video}
-                  resizeMode={ResizeMode.CONTAIN}
-                  shouldPlay
-                  isLooping
-                  useNativeControls
-                />
-              </View>
-            </>
-          )}
         </>
       )}
     </ScrollView>
@@ -248,34 +189,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "transparent",
   },
-  imageSelected: {
-    borderColor: "#7c5cff",
-  },
   gridImage: {
     width: IMAGE_SIZE,
-    height: IMAGE_SIZE * 1.46, // Match 832:1216 aspect ratio
-  },
-  selectedBadge: {
-    position: "absolute",
-    bottom: 6,
-    left: 6,
-    backgroundColor: "#7c5cff",
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  selectedBadgeText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  videoContainer: {
-    borderRadius: 10,
-    overflow: "hidden",
-    backgroundColor: "#1a1a2e",
-  },
-  video: {
-    width: SCREEN_WIDTH - 32,
-    height: SCREEN_WIDTH - 32, // 640x640 = square
+    height: IMAGE_SIZE * 1.46,
   },
 });

@@ -2,14 +2,14 @@
 FastAPI backend server for the AI Video Generator.
 
 Endpoints:
-  POST /generate          - Text-to-image only
-  POST /generate/full     - Full pipeline: prompt -> image -> video
-  POST /generate/image    - Text-to-image only (compat route)
+  POST /generate/image    - Generate image via ComfyUI (comfy_script)
   POST /generate/video    - Image-to-video only (accepts image upload)
   GET  /output/{filename} - Serve generated files
 """
 
 import io
+import random
+import shutil
 import traceback
 import uuid
 from pathlib import Path
@@ -21,11 +21,11 @@ from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image
 from pydantic import BaseModel
 
-from backend.pipelines import image_to_video, text_to_image
+from backend.config import get_comfy_output_dir
+from backend.pipelines import image_to_video
 
 app = FastAPI(title="AI Video Generator")
 
-# Allow requests from Expo dev server
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -36,7 +36,6 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Catch all unhandled errors and return them as JSON (with CORS)."""
     tb = traceback.format_exc()
     print(f"[ERROR] {request.url}\n{tb}")
     return JSONResponse(
@@ -48,20 +47,37 @@ async def global_exception_handler(request: Request, exc: Exception):
 OUTPUT_DIR = Path("output")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+COMFY_URL = "http://127.0.0.1:8188/"
 
-class GenerateRequest(BaseModel):
-    prompt: str
-    negative_prompt: str = "cartoon, deformed"
-    motion_prompt: str | None = None
-    num_images: int = 1
-    image_index: int = 0  # Which of the batch images to use for video
-    seed: int | None = None
+DEFAULT_NEGATIVE_PROMPT = (
+    "low quality, worst quality, blurry, jpeg artifacts, bad anatomy, "
+    "extra fingers, missing fingers, extra limbs, malformed hands, "
+    "deformed face, cross-eyed, poorly drawn hands, poorly drawn face, "
+    "duplicate body, cropped, watermark, text, logo, oversaturated, "
+    "flat lighting, mutated anatomy"
+)
 
 
+# ---------------------------------------------------------------------------
+# Lazy ComfyUI connection
+# ---------------------------------------------------------------------------
+_comfy_loaded = False
+
+
+def _ensure_comfy():
+    global _comfy_loaded
+    if not _comfy_loaded:
+        from comfy_script.runtime import load
+        load(COMFY_URL)
+        _comfy_loaded = True
+
+
+# ---------------------------------------------------------------------------
+# Request / Response models
+# ---------------------------------------------------------------------------
 class GenerateImageRequest(BaseModel):
     prompt: str
-    negative_prompt: str = "cartoon, deformed"
-    num_images: int = 1
+    negative_prompt: str = DEFAULT_NEGATIVE_PROMPT
     seed: int | None = None
 
 
@@ -73,74 +89,73 @@ class VideoResponse(BaseModel):
     video_url: str
 
 
-class FullResponse(BaseModel):
-    image_urls: list[str]
-    video_url: str
-
-
-def _generate_full_sync(req: GenerateRequest) -> FullResponse:
-    """Run the full prompt -> image -> video pipeline off the event loop."""
-    images = text_to_image.generate(
-        prompt=req.prompt,
-        negative_prompt=req.negative_prompt,
-        num_images=req.num_images,
-        seed=req.seed,
+# ---------------------------------------------------------------------------
+# Image generation via ComfyUI (comfy_script)
+# ---------------------------------------------------------------------------
+def _generate_image_comfy(req: GenerateImageRequest) -> ImageResponse:
+    _ensure_comfy()
+    from comfy_script.runtime import Workflow
+    from comfy_script.runtime.nodes import (
+        CheckpointLoaderSimple,
+        CLIPTextEncode,
+        EmptyLatentImage,
+        KSampler,
+        LoraLoaderModelOnly,
+        SaveImage,
+        VAEDecode,
     )
 
-    image_filenames = []
+    seed = req.seed if req.seed is not None else random.randint(0, 2**63)
     batch_id = uuid.uuid4().hex[:8]
-    for i, img in enumerate(images):
-        filename = f"{batch_id}_img_{i}.png"
-        img.save(OUTPUT_DIR / filename)
-        image_filenames.append(filename)
 
-    # Free VRAM before switching to the heavier I2V pipeline.
-    text_to_image.unload_pipeline()
+    with Workflow(wait=True):
+        model, clip, vae = CheckpointLoaderSimple(
+            "juggernautXL_ragnarokBy.safetensors"
+        )
+        model = LoraLoaderModelOnly(
+            model, "dmd2_sdxl_4step_lora.safetensors", 0.5
+        )
+        model = LoraLoaderModelOnly(
+            model, "dmd2_sdxl_4step_lora_fp16.safetensors", 0.5
+        )
+        conditioning = CLIPTextEncode(req.prompt, clip)
+        conditioning2 = CLIPTextEncode(req.negative_prompt, clip)
+        latent = EmptyLatentImage(832, 1216, 1)
+        latent = KSampler(
+            model, seed, 8, 1.4,
+            "lcm", "normal",
+            conditioning, conditioning2,
+            latent, 1,
+        )
+        image = VAEDecode(latent, vae)
+        SaveImage(image, batch_id)
 
-    idx = max(0, min(req.image_index, len(images) - 1))
-    selected_image = images[idx]
+    # Collect saved images from ComfyUI output dir and copy to our output dir
+    comfy_output = get_comfy_output_dir()
+    saved = sorted(comfy_output.glob(f"{batch_id}_*.png"))
+    if not saved:
+        raise RuntimeError(
+            f"No images found in ComfyUI output with prefix '{batch_id}'. "
+            "Check that ComfyUI is running and the workflow completed."
+        )
 
-    video_filename = f"{batch_id}_video.mp4"
-    image_to_video.generate(
-        image=selected_image,
-        prompt=req.motion_prompt or req.prompt,
-        seed=req.seed,
-        output_path=str(OUTPUT_DIR / video_filename),
-    )
-
-    image_to_video.unload_pipeline()
-
-    return FullResponse(
-        image_urls=[f"/output/{f}" for f in image_filenames],
-        video_url=f"/output/{video_filename}",
-    )
-
-
-def _generate_image_sync(req: GenerateImageRequest) -> ImageResponse:
-    """Run text-to-image generation off the event loop."""
-    images = text_to_image.generate(
-        prompt=req.prompt,
-        negative_prompt=req.negative_prompt,
-        num_images=req.num_images,
-        seed=req.seed,
-    )
-
-    filenames = []
-    batch_id = uuid.uuid4().hex[:8]
-    for i, img in enumerate(images):
-        filename = f"{batch_id}_img_{i}.png"
-        img.save(OUTPUT_DIR / filename)
-        filenames.append(filename)
+    filenames: list[str] = []
+    for src in saved:
+        dest = OUTPUT_DIR / src.name
+        shutil.copy2(src, dest)
+        filenames.append(src.name)
 
     return ImageResponse(image_urls=[f"/output/{f}" for f in filenames])
 
 
+# ---------------------------------------------------------------------------
+# Video generation (existing I2V pipeline)
+# ---------------------------------------------------------------------------
 def _generate_video_sync(
     pil_image: Image.Image,
     prompt: str,
     seed: int | None,
 ) -> VideoResponse:
-    """Run image-to-video generation off the event loop."""
     video_filename = f"{uuid.uuid4().hex[:8]}_video.mp4"
     image_to_video.generate(
         image=pil_image,
@@ -148,26 +163,16 @@ def _generate_video_sync(
         seed=seed,
         output_path=str(OUTPUT_DIR / video_filename),
     )
-
     return VideoResponse(video_url=f"/output/{video_filename}")
 
 
-@app.post("/generate", response_model=ImageResponse)
-async def generate(req: GenerateImageRequest):
-    """Generate images from a text prompt."""
-    return await run_in_threadpool(_generate_image_sync, req)
-
-
-@app.post("/generate/full", response_model=FullResponse)
-async def generate_full(req: GenerateRequest):
-    """Full pipeline: text -> images -> select one -> video."""
-    return await run_in_threadpool(_generate_full_sync, req)
-
-
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
 @app.post("/generate/image", response_model=ImageResponse)
 async def generate_image(req: GenerateImageRequest):
-    """Generate images from a text prompt."""
-    return await run_in_threadpool(_generate_image_sync, req)
+    """Generate an image from a text prompt via ComfyUI."""
+    return await run_in_threadpool(_generate_image_comfy, req)
 
 
 @app.post("/generate/video", response_model=VideoResponse)
@@ -184,7 +189,6 @@ async def generate_video(
 
 @app.get("/output/{filename}")
 async def serve_output(filename: str):
-    """Serve generated images and videos."""
     file_path = OUTPUT_DIR / filename
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")

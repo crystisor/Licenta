@@ -1,18 +1,12 @@
 import { Platform } from "react-native";
 
-// Web uses localhost, Android emulator uses 10.0.2.2 (host loopback alias)
 const DEFAULT_API_URL = Platform.select({
-  web: "http://localhost:8000",
-  android: "http://10.0.2.2:8000",
-  default: "http://localhost:8000",
+  web: "http://localhost:8001",
+  android: "http://10.0.2.2:8001",
+  default: "http://localhost:8001",
 });
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL;
-
-export interface FullGenerateResponse {
-  image_urls: string[];
-  video_url: string;
-}
 
 export interface ImageGenerateResponse {
   image_urls: string[];
@@ -23,42 +17,21 @@ export interface VideoGenerateResponse {
 }
 
 /**
- * Full pipeline: prompt → images → video
+ * Generate an image from a text prompt via ComfyUI.
  */
-export async function generateFull(
+export async function generateImage(
   prompt: string,
-  motionPrompt?: string,
-  imageIndex: number = 0
-): Promise<FullGenerateResponse> {
-  const res = await fetch(`${API_BASE}/generate/full`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      prompt,
-      motion_prompt: motionPrompt || null,
-      image_index: imageIndex,
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Generate failed: ${err}`);
-  }
-
-  return res.json();
-}
-
-/**
- * Generate images only from a text prompt.
- */
-export async function generateImages(
-  prompt: string,
-  numImages: number = 1
+  negativePrompt?: string,
+  seed?: number
 ): Promise<ImageGenerateResponse> {
   const res = await fetch(`${API_BASE}/generate/image`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, num_images: numImages }),
+    body: JSON.stringify({
+      prompt,
+      ...(negativePrompt ? { negative_prompt: negativePrompt } : {}),
+      ...(seed !== undefined ? { seed } : {}),
+    }),
   });
 
   if (!res.ok) {
@@ -70,7 +43,7 @@ export async function generateImages(
 }
 
 /**
- * Convert a full relative URL to an absolute URL for display.
+ * Convert a relative path to an absolute URL for display.
  */
 export function getMediaUrl(relativePath: string): string {
   return `${API_BASE}${relativePath}`;
