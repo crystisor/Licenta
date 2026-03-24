@@ -3,26 +3,23 @@ FastAPI backend server for the AI Video Generator.
 
 Endpoints:
   POST /generate/image    - Generate image via ComfyUI (comfy_script)
-  POST /generate/video    - Image-to-video only (accepts image upload)
   GET  /output/{filename} - Serve generated files
 """
 
-import io
 import random
 import shutil
+import time
 import traceback
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from PIL import Image
 from pydantic import BaseModel
 
-from backend.config import get_comfy_output_dir
-from backend.pipelines import image_to_video
+from backend.config import get_comfy_input_dir, get_comfy_output_dir
 
 app = FastAPI(title="AI Video Generator")
 
@@ -155,21 +152,156 @@ def _generate_image_comfy(req: GenerateImageRequest) -> ImageResponse:
 
 
 # ---------------------------------------------------------------------------
-# Video generation (existing I2V pipeline)
+# Default I2V negative prompt (Chinese, from ComfyUI workflow)
 # ---------------------------------------------------------------------------
-def _generate_video_sync(
-    pil_image: Image.Image,
+DEFAULT_I2V_NEGATIVE_PROMPT = (
+    "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，"
+    "整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，"
+    "画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，"
+    "静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走"
+)
+
+
+# ---------------------------------------------------------------------------
+# Video generation via ComfyUI (comfy_script) - Wan 2.2 I2V workflow
+# ---------------------------------------------------------------------------
+def _generate_video_comfy(
+    image_path: Path,
     prompt: str,
     seed: int | None,
 ) -> VideoResponse:
-    video_filename = f"{uuid.uuid4().hex[:8]}_video.mp4"
-    image_to_video.generate(
-        image=pil_image,
-        prompt=prompt,
-        seed=seed,
-        output_path=str(OUTPUT_DIR / video_filename),
+    _ensure_comfy()
+    from comfy_script.runtime import Workflow
+    from comfy_script.runtime.nodes import (
+        CLIPLoader,
+        CLIPTextEncode,
+        CreateVideo,
+        KSamplerAdvanced,
+        LoadImage,
+        LoraLoaderModelOnly,
+        ModelSamplingSD3,
+        PrimitiveFloat,
+        PrimitiveInt,
+        SaveVideo,
+        UNETLoader,
+        VAEDecode,
+        VAELoader,
+        WanImageToVideo,
     )
-    return VideoResponse(video_url=f"/output/{video_filename}")
+
+    if seed is None:
+        seed = random.randint(0, 2**63)
+
+    video_prefix = f"{uuid.uuid4().hex[:8]}_video"
+
+    # Submit workflow WITHOUT wait=True — the _watch retry loop in comfy_script
+    # hangs indefinitely when SaveVideo output can't be opened as a PIL Image.
+    # Instead, we poll for the output file below.
+    with Workflow():
+        steps = PrimitiveInt(4)
+        cfg = PrimitiveFloat(1)
+        boundary_step = PrimitiveInt(2)
+
+        # Low noise model + LoRA
+        model_low = UNETLoader(
+            "wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors", "default"
+        )
+        model_low = LoraLoaderModelOnly(
+            model_low,
+            "wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+            1.0,
+        )
+        model_low = ModelSamplingSD3(model_low, 5.0)
+
+        # CLIP + conditioning
+        clip = CLIPLoader(
+            "umt5_xxl_fp8_e4m3fn_scaled.safetensors", "wan", "default"
+        )
+        conditioning = CLIPTextEncode(prompt, clip)
+        conditioning2 = CLIPTextEncode(DEFAULT_I2V_NEGATIVE_PROMPT, clip)
+
+        # VAE + image encoding
+        vae = VAELoader("wan_2.1_vae.safetensors")
+        image, _ = LoadImage(image_path.name)
+        positive, negative, latent = WanImageToVideo(
+            conditioning, conditioning2, vae, 640, 640, 81, 1, None, image
+        )
+
+        # High noise model + LoRA
+        model_high = UNETLoader(
+            "wan2.2_i2v_high_noise_14B_fp8_scaled.safetensors", "default"
+        )
+        model_high = LoraLoaderModelOnly(
+            model_high,
+            "wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+            1.0,
+        )
+        model_high = ModelSamplingSD3(model_high, 5.0)
+
+        # Dual-pass denoising: high noise (steps 0→2), then low noise (steps 2→4)
+        latent = KSamplerAdvanced(
+            model_high, "enable", seed, steps, cfg,
+            "euler", "simple",
+            positive, negative, latent,
+            0, boundary_step, "enable",
+        )
+        latent = KSamplerAdvanced(
+            model_low, "disable", 0, steps, cfg,
+            "euler", "simple",
+            positive, negative, latent,
+            boundary_step, steps, "disable",
+        )
+
+        decoded = VAEDecode(latent, vae)
+        video = CreateVideo(decoded, 16, None)
+        SaveVideo(video, video_prefix, "auto", "auto")
+
+    # Poll for the video file in ComfyUI's output dir, then copy to our output dir.
+    # Since we don't use wait=True, the file may still be written when first found.
+    # Wait for file size to stabilize before copying (moov atom is written last).
+    comfy_output = get_comfy_output_dir()
+    timeout = 600
+    poll_interval = 5
+    elapsed = 0
+    video_file = None
+    while elapsed < timeout:
+        matches = sorted(
+            comfy_output.glob(f"{video_prefix}*.mp4"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if matches:
+            video_file = matches[0]
+            break
+        print(f"[I2V] Waiting for video file '{video_prefix}*.mp4'... ({elapsed}s)")
+        time.sleep(poll_interval)
+        elapsed += poll_interval
+
+    if video_file is None:
+        raise RuntimeError(
+            f"No video found with prefix '{video_prefix}' after {timeout}s. "
+            "Check that ComfyUI completed the workflow."
+        )
+
+    # Wait for the file to finish writing (size stable for 3 consecutive checks)
+    stable_count = 0
+    last_size = -1
+    while stable_count < 3 and elapsed < timeout:
+        current_size = video_file.stat().st_size
+        if current_size == last_size:
+            stable_count += 1
+        else:
+            stable_count = 0
+        last_size = current_size
+        if stable_count < 3:
+            time.sleep(2)
+            elapsed += 2
+
+    dest = OUTPUT_DIR / video_file.name
+    shutil.copy2(video_file, dest)
+    print(f"[I2V] Copied video ({last_size} bytes) to {dest}")
+
+    return VideoResponse(video_url=f"/output/{dest.name}")
 
 
 # ---------------------------------------------------------------------------
@@ -181,26 +313,24 @@ async def generate_image(req: GenerateImageRequest):
     return await run_in_threadpool(_generate_image_comfy, req)
 
 
-@app.post("/generate/video", response_model=VideoResponse)
-async def generate_video(
-    image: UploadFile = File(...),
-    prompt: str = Form(...),
-    seed: int | None = Form(None),
-):
-    """Generate video from an uploaded image + motion prompt."""
-    image_data = await image.read()
-    pil_image = Image.open(io.BytesIO(image_data)).convert("RGB")
-    return await run_in_threadpool(_generate_video_sync, pil_image, prompt, seed)
-
-
 @app.post("/generate/animate", response_model=VideoResponse)
 async def animate_image(req: AnimateRequest):
-    """Animate a previously generated image using the I2V pipeline."""
+    """Animate a previously generated image using Wan 2.2 I2V via ComfyUI."""
     image_path = OUTPUT_DIR / req.image_filename
     if not image_path.exists():
-        raise HTTPException(status_code=404, detail=f"Image '{req.image_filename}' not found in output directory.")
-    pil_image = Image.open(image_path).convert("RGB")
-    return await run_in_threadpool(_generate_video_sync, pil_image, req.prompt, req.seed)
+        raise HTTPException(
+            status_code=404,
+            detail=f"Image '{req.image_filename}' not found in output directory.",
+        )
+
+    # Copy image to ComfyUI input dir so LoadImage can find it
+    comfy_input = get_comfy_input_dir()
+    comfy_image_path = comfy_input / req.image_filename
+    shutil.copy2(image_path, comfy_image_path)
+
+    return await run_in_threadpool(
+        _generate_video_comfy, comfy_image_path, req.prompt, req.seed
+    )
 
 
 @app.get("/output/{filename}")
