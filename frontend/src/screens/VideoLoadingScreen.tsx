@@ -1,25 +1,36 @@
-import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { ScreenShell } from '../components/ScreenShell';
+import { useAppContext } from '../context/AppContext';
+import { getAnimateStatus } from '../services/api';
 import { theme } from '../theme';
 
-interface LoadingScreenProps {
-  prompt: string;
-  debugPanel?: ReactNode;
-}
-
 const STEPS = [
-  'Gathering starlight and memory',
-  'Translating the prompt',
-  'Rendering the image',
-  'Writing the character\'s lore',
+  'Preparing motion',
+  'Rendering frames',
+  'Encoding video',
+  'Finalizing',
 ];
 
-export function LoadingScreen({ prompt, debugPanel }: LoadingScreenProps) {
-  const [progress, setProgress] = useState(10);
+function getActiveStep(progress: number): number {
+  if (progress >= 95) return 3;
+  if (progress >= 70) return 2;
+  if (progress >= 20) return 1;
+  return 0;
+}
+
+export function VideoLoadingScreen() {
+  const router = useRouter();
+  const { videoJobId, setVideoUrl, setVideoJobId, motionPrompt } = useAppContext();
+
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
   const orbScale = useRef(new Animated.Value(1)).current;
 
+  // Orb breathing animation
   useEffect(() => {
     const animation = Animated.loop(
       Animated.sequence([
@@ -37,53 +48,92 @@ export function LoadingScreen({ prompt, debugPanel }: LoadingScreenProps) {
         }),
       ]),
     );
-
     animation.start();
-    return () => {
-      animation.stop();
-    };
+    return () => animation.stop();
   }, [orbScale]);
 
+  // Poll for job status
   useEffect(() => {
-    const timer = setInterval(() => {
-      setProgress((current) => {
-        if (current >= 92) {
-          return current;
+    if (!videoJobId) return;
+
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const status = await getAnimateStatus(videoJobId);
+
+        if (cancelled) return;
+
+        if (status.status === 'processing') {
+          setProgress(status.progress ?? 0);
+        } else if (status.status === 'complete') {
+          setProgress(100);
+          setVideoUrl(status.video_url ?? null);
+          setVideoJobId(null);
+          router.replace('/display');
+          return; // stop polling
+        } else if (status.status === 'error') {
+          setError(status.detail ?? 'Video generation failed.');
+          return; // stop polling
         }
-        return current + 6;
-      });
-    }, 340);
+      } catch {
+        if (cancelled) return;
+        setError('Connection lost \u2014 video generation may have failed.');
+        return; // stop polling
+      }
+    };
+
+    // Initial poll immediately
+    poll();
+    const interval = setInterval(poll, 10_000);
 
     return () => {
-      clearInterval(timer);
+      cancelled = true;
+      clearInterval(interval);
     };
-  }, []);
+  }, [videoJobId, setVideoUrl, setVideoJobId, router]);
 
-  const activeStep = useMemo(() => {
-    if (progress >= 85) {
-      return 3;
-    }
-    if (progress >= 60) {
-      return 2;
-    }
-    if (progress >= 30) {
-      return 1;
-    }
-    return 0;
-  }, [progress]);
+  const activeStep = useMemo(() => getActiveStep(progress), [progress]);
+
+  if (error) {
+    return (
+      <ScreenShell
+        eyebrow="Generation failed"
+        title="Something went wrong"
+        subtitle={error}
+        contentContainerStyle={styles.content}
+      >
+        <View style={styles.center}>
+          <Pressable
+            onPress={() => router.replace('/display')}
+            style={({ pressed }) => [
+              styles.retryButton,
+              pressed && styles.retryButtonPressed,
+            ]}
+          >
+            <Text style={styles.retryButtonText}>Back to card</Text>
+          </Pressable>
+        </View>
+      </ScreenShell>
+    );
+  }
 
   return (
     <ScreenShell
-      eyebrow="Ritual in progress"
-      title="Rendering your image"
-      subtitle="The backend text-to-image pipeline is processing your prompt now."
+      eyebrow="Animation in progress"
+      title="Rendering your video"
+      subtitle="The backend image-to-video pipeline is animating your character now."
       contentContainerStyle={styles.content}
-      footer={<Text style={styles.footer}>Prompt: {prompt.trim() || 'Untitled image'}</Text>}
+      footer={
+        <Text style={styles.footer}>
+          Motion: {motionPrompt.trim() || 'No motion prompt'}
+        </Text>
+      }
     >
       <View style={styles.center}>
         <Animated.View style={[styles.orbOuter, { transform: [{ scale: orbScale }] }]}>
           <View style={styles.orbInner}>
-            <Text style={styles.orbGlyph}>AL</Text>
+            <Text style={styles.orbGlyph}>I2V</Text>
           </View>
         </Animated.View>
 
@@ -114,7 +164,6 @@ export function LoadingScreen({ prompt, debugPanel }: LoadingScreenProps) {
             ))}
           </View>
         </View>
-        {debugPanel}
       </View>
     </ScreenShell>
   );
@@ -212,5 +261,26 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: 12,
     textAlign: 'center',
+  },
+  retryButton: {
+    minHeight: 54,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(184, 160, 255, 0.35)',
+    backgroundColor: 'rgba(184, 160, 255, 0.12)',
+  },
+  retryButtonPressed: {
+    transform: [{ scale: 0.98 }],
+    backgroundColor: 'rgba(184, 160, 255, 0.2)',
+  },
+  retryButtonText: {
+    color: theme.colors.text,
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
 });

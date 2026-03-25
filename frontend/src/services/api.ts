@@ -1,20 +1,17 @@
 import { extractTraceEventsFromHeader, getDebugTraceHeaderName } from '../debugFlow';
-import { DebugTraceEvent, GeneratedImage } from '../types';
+import { AnimateResponse, AnimateStatusResponse, CardMeta, DebugTraceEvent, GeneratedImage } from '../types';
 
 export const EX_IMAGE_ENDPOINT = '/generate/ex-image';
 export const ANIMATE_ENDPOINT = '/generate/animate';
+export const ANIMATE_STATUS_ENDPOINT = '/generate/animate/status';
 
 interface ImageResponsePayload {
   image_urls: string[];
-}
-
-interface VideoResponsePayload {
-  video_url: string;
-}
-
-export interface GenerateVideoResult {
-  videoUrl: string;
-  requestId: string;
+  card_meta?: {
+    title: string;
+    lore: string;
+    stats: Record<string, number>;
+  } | null;
 }
 
 export class ImageGenerationError extends Error {
@@ -100,10 +97,15 @@ export async function generateImage(prompt: string, requestId: string): Promise<
     );
   }
 
+  const cardMeta: CardMeta | null = payload.card_meta
+    ? { title: payload.card_meta.title, lore: payload.card_meta.lore, stats: payload.card_meta.stats }
+    : null;
+
   return {
     prompt,
     imageUrl: toAbsoluteUrl(payload.image_urls[0]),
     requestId: resolvedRequestId,
+    cardMeta,
     backendTraceEvents,
   };
 }
@@ -112,7 +114,7 @@ export async function animateImage(
   imageFilename: string,
   motionPrompt: string,
   requestId: string,
-): Promise<GenerateVideoResult> {
+): Promise<AnimateResponse> {
   const response = await fetch(`${getApiBaseUrl()}${ANIMATE_ENDPOINT}`, {
     method: 'POST',
     headers: {
@@ -125,9 +127,9 @@ export async function animateImage(
     }),
   });
 
-  let payload: VideoResponsePayload | { detail?: string } | null = null;
+  let payload: AnimateResponse | { detail?: string } | null = null;
   try {
-    payload = (await response.json()) as VideoResponsePayload | { detail?: string };
+    payload = (await response.json()) as AnimateResponse | { detail?: string };
   } catch {
     payload = null;
   }
@@ -140,12 +142,43 @@ export async function animateImage(
     );
   }
 
-  if (!payload || !('video_url' in payload) || !payload.video_url) {
-    throw new Error('The backend did not return a generated video.');
+  if (!payload || !('job_id' in payload) || !payload.job_id) {
+    throw new Error('The backend did not return a job ID.');
   }
 
-  return {
-    videoUrl: toAbsoluteUrl(payload.video_url),
-    requestId,
-  };
+  return { job_id: payload.job_id };
+}
+
+export async function getAnimateStatus(jobId: string): Promise<AnimateStatusResponse> {
+  const response = await fetch(`${getApiBaseUrl()}${ANIMATE_STATUS_ENDPOINT}/${jobId}`);
+
+  let payload: AnimateStatusResponse | { detail?: string } | null = null;
+  try {
+    payload = (await response.json()) as AnimateStatusResponse | { detail?: string };
+  } catch {
+    payload = null;
+  }
+
+  if (response.status === 404) {
+    throw new Error('Job not found');
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      (payload && 'detail' in payload && typeof payload.detail === 'string')
+        ? payload.detail
+        : 'Failed to fetch video status.',
+    );
+  }
+
+  if (!payload || !('status' in payload)) {
+    throw new Error('Invalid status response from backend.');
+  }
+
+  // Convert relative video_url to absolute
+  if (payload.video_url) {
+    payload = { ...payload, video_url: toAbsoluteUrl(payload.video_url) };
+  }
+
+  return payload as AnimateStatusResponse;
 }

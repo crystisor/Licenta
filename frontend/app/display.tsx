@@ -9,6 +9,7 @@ export default function DisplayPage() {
     result,
     isAnimating,
     videoUrl,
+    videoJobActive,
     handleAnimate,
     handleReset,
     recordTraceEvent,
@@ -36,6 +37,7 @@ export default function DisplayPage() {
       })}
       onReset={handleReset}
       result={result}
+      videoJobActive={videoJobActive}
       videoUrl={videoUrl}
     />
   );

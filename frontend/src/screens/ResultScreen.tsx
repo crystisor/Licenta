@@ -18,20 +18,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { theme } from '../theme';
-import { GeneratedImage, ImageMeta } from '../types';
+import { CardMeta, GeneratedImage } from '../types';
 
-const MOCK_META: ImageMeta = {
-  title: 'The Wandering Light',
-  description:
-    'A vision conjured from the ancient prompt archives, shimmering between worlds of thought and form.',
-  lore: 'The light bends through forgotten corridors, each beam a memory made tangible by the weave of creation.',
+const FALLBACK_META: CardMeta = {
+  title: 'The Unnamed',
+  lore: 'A vision conjured from the ancient prompt archives. The full story remains unwritten.',
   stats: {
-    Resolution: '832\u00d71216',
-    Steps: 35,
-    CFG: 3.5,
-    Sampler: 'DPM++ 2M SDE',
-    Scheduler: 'Karras',
-    Denoise: 1.0,
+    Strength: 5,
+    Magic: 5,
+    Defense: 5,
+    Agility: 5,
   },
 };
 
@@ -41,6 +37,7 @@ interface ResultScreenProps {
   onAnimate: (motionPrompt: string) => void;
   isAnimating?: boolean;
   videoUrl?: string | null;
+  videoJobActive?: boolean;
   onImageLoad?: () => void;
   onImageError?: (message: string) => void;
   debugPanel?: ReactNode;
@@ -52,6 +49,7 @@ export function ResultScreen({
   onAnimate,
   isAnimating = false,
   videoUrl = null,
+  videoJobActive = false,
   onImageLoad,
   onImageError,
   debugPanel,
@@ -147,7 +145,7 @@ export function ResultScreen({
     onImageError?.(event.nativeEvent.error || 'Image failed to load.');
   };
 
-  const meta = MOCK_META;
+  const meta = result.cardMeta ?? FALLBACK_META;
   const statEntries = Object.entries(meta.stats);
 
   return (
@@ -221,8 +219,8 @@ export function ResultScreen({
             <View style={styles.statsCard}>
               <View style={styles.statsHeader}>
                 <View>
-                  <Text style={styles.statsTitle}>Generation</Text>
-                  <Text style={styles.statsSubtitle}>Pipeline parameters</Text>
+                  <Text style={styles.statsTitle}>Attributes</Text>
+                  <Text style={styles.statsSubtitle}>Character stats</Text>
                 </View>
               </View>
               <View style={styles.statsGrid}>
@@ -252,16 +250,12 @@ export function ResultScreen({
               </Text>
             </View>
 
-            {/* ── Original Prompt ── */}
-            <View style={styles.promptCard}>
-              <Text style={styles.promptLabel}>Original Prompt</Text>
-              <Text style={styles.promptText}>{result.prompt}</Text>
-            </View>
-
             {/* ── Animate Section ── */}
             <View style={styles.animateCard}>
               <Text style={styles.animateTitle}>Animate</Text>
-              <Text style={styles.animateSubtitle}>Bring this image to life</Text>
+              <Text style={styles.animateSubtitle}>
+                {videoJobActive ? 'Video already generating...' : 'Bring this image to life'}
+              </Text>
               <TextInput
                 style={styles.motionInput}
                 placeholder="Describe the motion (e.g. camera slowly zooms in, wind blows hair...)"
@@ -270,21 +264,21 @@ export function ResultScreen({
                 onChangeText={setMotionPrompt}
                 multiline
                 numberOfLines={3}
-                editable={!isAnimating}
+                editable={!isAnimating && !videoJobActive}
               />
               <Pressable
                 onPress={() => onAnimate(motionPrompt)}
-                disabled={isAnimating || !motionPrompt.trim()}
+                disabled={isAnimating || videoJobActive || !motionPrompt.trim()}
                 style={({ pressed }) => [
                   styles.animateButton,
                   pressed && styles.animateButtonPressed,
-                  (isAnimating || !motionPrompt.trim()) && styles.animateButtonDisabled,
+                  (isAnimating || videoJobActive || !motionPrompt.trim()) && styles.animateButtonDisabled,
                 ]}
               >
                 {isAnimating ? (
                   <View style={styles.animateButtonContent}>
                     <ActivityIndicator size="small" color={theme.colors.text} />
-                    <Text style={styles.animateButtonText}>Animating...</Text>
+                    <Text style={styles.animateButtonText}>Starting...</Text>
                   </View>
                 ) : (
                   <Text style={styles.animateButtonText}>Animate</Text>
@@ -528,28 +522,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 24,
     fontStyle: 'italic',
-  },
-
-  // ── Prompt ──
-  promptCard: {
-    gap: 8,
-    padding: 16,
-    borderRadius: theme.radius.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderWidth: 1,
-    borderColor: 'rgba(160, 166, 192, 0.12)',
-  },
-  promptLabel: {
-    color: theme.colors.textMuted,
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-  },
-  promptText: {
-    color: theme.colors.text,
-    fontSize: 15,
-    lineHeight: 22,
   },
 
   // ── Button ──

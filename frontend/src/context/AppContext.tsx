@@ -27,9 +27,14 @@ interface AppContextValue {
   errorMessage: string | null;
   isAnimating: boolean;
   videoUrl: string | null;
+  videoJobId: string | null;
+  videoJobActive: boolean;
+  motionPrompt: string;
   currentTrace: DebugTraceRecord | null;
   recentTraces: DebugTraceRecord[];
   debugEnabled: boolean;
+  setVideoUrl: (url: string | null) => void;
+  setVideoJobId: (id: string | null) => void;
   handleCast: () => Promise<void>;
   handleAnimate: (motionPrompt: string) => Promise<void>;
   handleReset: () => void;
@@ -52,8 +57,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoJobId, setVideoJobId] = useState<string | null>(null);
+  const [motionPrompt, setMotionPrompt] = useState('');
   const [currentTrace, setCurrentTrace] = useState<DebugTraceRecord | null>(null);
   const [recentTraces, setRecentTraces] = useState<DebugTraceRecord[]>([]);
+
+  const videoJobActive = videoJobId !== null && videoUrl === null;
 
   const debugEnabled = isDebugFlowEnabled();
 
@@ -139,8 +148,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [mergeTraceEvents, prompt, recordTraceEvent, router, startTrace]);
 
-  const handleAnimate = useCallback(async (motionPrompt: string) => {
-    if (!result || !motionPrompt.trim()) return;
+  const handleAnimate = useCallback(async (mp: string) => {
+    if (!result || !mp.trim()) return;
 
     const imageFilename = result.imageUrl.split('/').pop();
     if (!imageFilename) return;
@@ -149,21 +158,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setIsAnimating(true);
 
     try {
-      const videoResult = await animateImage(imageFilename, motionPrompt.trim(), requestId);
-      setVideoUrl(videoResult.videoUrl);
+      const { job_id } = await animateImage(imageFilename, mp.trim(), requestId);
+      setVideoJobId(job_id);
+      setMotionPrompt(mp.trim());
+      router.push('/video-loading');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Animation failed.';
       setErrorMessage(message);
     } finally {
       setIsAnimating(false);
     }
-  }, [result]);
+  }, [result, router]);
 
   const handleReset = useCallback(() => {
     setResult(null);
     setPrompt('');
     setErrorMessage(null);
     setVideoUrl(null);
+    setVideoJobId(null);
+    setMotionPrompt('');
     setIsAnimating(false);
     router.replace('/home');
   }, [router]);
@@ -177,6 +190,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         errorMessage,
         isAnimating,
         videoUrl,
+        videoJobId,
+        videoJobActive,
+        motionPrompt,
+        setVideoUrl,
+        setVideoJobId,
         currentTrace,
         recentTraces,
         debugEnabled,
