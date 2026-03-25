@@ -19,7 +19,6 @@ export interface DebugTraceRecord {
   events: DebugTraceEvent[];
 }
 
-export type Screen = 'summon' | 'loading' | 'result';
 
 export interface ImageMeta {
   title: string;

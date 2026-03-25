@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from backend.config import get_comfy_input_dir, get_comfy_output_dir
+from config import get_comfy_input_dir, get_comfy_output_dir
 
 app = FastAPI(title="AI Video Generator")
 

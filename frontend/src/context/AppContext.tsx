@@ -1,6 +1,5 @@
-import { StatusBar } from 'expo-status-bar';
-import { useCallback, useState } from 'react';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { createContext, ReactNode, useCallback, useContext, useState } from 'react';
+import { useRouter } from 'expo-router';
 
 import {
   appendTraceEvents,
@@ -9,13 +8,9 @@ import {
   isDebugFlowEnabled,
   pushRecentTrace,
   trackFrontendEvent,
-} from './debugFlow';
-import { DebugTracePanel } from './components/DebugTracePanel';
-import { LoadingScreen } from './screens/LoadingScreen';
-import { ResultScreen } from './screens/ResultScreen';
-import { SummonScreen } from './screens/SummonScreen';
-import { animateImage, EX_IMAGE_ENDPOINT, generateImage, ImageGenerationError } from './services/api';
-import { DebugTraceRecord, GeneratedImage, Screen } from './types';
+} from '../debugFlow';
+import { animateImage, EX_IMAGE_ENDPOINT, generateImage, ImageGenerationError } from '../services/api';
+import { DebugTraceRecord, GeneratedImage } from '../types';
 
 const MIN_LOADING_MS = 1400;
 
@@ -25,8 +20,33 @@ function sleep(ms: number) {
   });
 }
 
-export default function App() {
-  const [screen, setScreen] = useState<Screen>('summon');
+interface AppContextValue {
+  prompt: string;
+  setPrompt: (value: string) => void;
+  result: GeneratedImage | null;
+  errorMessage: string | null;
+  isAnimating: boolean;
+  videoUrl: string | null;
+  currentTrace: DebugTraceRecord | null;
+  recentTraces: DebugTraceRecord[];
+  debugEnabled: boolean;
+  handleCast: () => Promise<void>;
+  handleAnimate: (motionPrompt: string) => Promise<void>;
+  handleReset: () => void;
+  recordTraceEvent: (stage: string, status: string, details?: Record<string, unknown> | string) => void;
+}
+
+const AppContext = createContext<AppContextValue | null>(null);
+
+export function useAppContext() {
+  const ctx = useContext(AppContext);
+  if (!ctx) throw new Error('useAppContext must be used within AppProvider');
+  return ctx;
+}
+
+export function AppProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+
   const [result, setResult] = useState<GeneratedImage | null>(null);
   const [prompt, setPrompt] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -38,9 +58,7 @@ export default function App() {
   const debugEnabled = isDebugFlowEnabled();
 
   const startTrace = useCallback((requestId: string, nextPrompt: string) => {
-    if (!debugEnabled) {
-      return;
-    }
+    if (!debugEnabled) return;
 
     setRecentTraces((previous) => pushRecentTrace(previous, currentTrace));
 
@@ -55,14 +73,10 @@ export default function App() {
   }, [currentTrace, debugEnabled]);
 
   const mergeTraceEvents = useCallback((events: DebugTraceRecord['events']) => {
-    if (!debugEnabled || events.length === 0) {
-      return;
-    }
+    if (!debugEnabled || events.length === 0) return;
 
     setCurrentTrace((previous) => {
-      if (!previous) {
-        return previous;
-      }
+      if (!previous) return previous;
       return appendTraceEvents(previous, events);
     });
   }, [debugEnabled]);
@@ -72,29 +86,23 @@ export default function App() {
     status: string,
     details?: Record<string, unknown> | string,
   ) => {
-    if (!debugEnabled) {
-      return;
-    }
+    if (!debugEnabled) return;
 
     setCurrentTrace((previous) => {
-      if (!previous) {
-        return previous;
-      }
+      if (!previous) return previous;
       return trackFrontendEvent(previous, stage, status, details);
     });
   }, [debugEnabled]);
 
   const handleCast = useCallback(async () => {
-    if (!prompt.trim()) {
-      return;
-    }
+    if (!prompt.trim()) return;
 
     const trimmedPrompt = prompt.trim();
     const requestId = createRequestId();
 
     startTrace(requestId, trimmedPrompt);
     setErrorMessage(null);
-    setScreen('loading');
+    router.push('/loading');
 
     const startedAt = Date.now();
 
@@ -114,7 +122,7 @@ export default function App() {
       }
 
       setResult(nextImage);
-      setScreen('result');
+      router.replace('/display');
     } catch (error) {
       if (error instanceof ImageGenerationError) {
         mergeTraceEvents(error.traceEvents);
@@ -127,9 +135,9 @@ export default function App() {
       recordTraceEvent('terminal_error', 'error', message);
       setResult(null);
       setErrorMessage(message);
-      setScreen('summon');
+      router.replace('/home');
     }
-  }, [mergeTraceEvents, prompt, recordTraceEvent, startTrace]);
+  }, [mergeTraceEvents, prompt, recordTraceEvent, router, startTrace]);
 
   const handleAnimate = useCallback(async (motionPrompt: string) => {
     if (!result || !motionPrompt.trim()) return;
@@ -157,40 +165,28 @@ export default function App() {
     setErrorMessage(null);
     setVideoUrl(null);
     setIsAnimating(false);
-    setScreen('summon');
-  }, []);
-
-  const debugPanel = debugEnabled ? (
-    <DebugTracePanel currentTrace={currentTrace} recentTraces={recentTraces} />
-  ) : null;
+    router.replace('/home');
+  }, [router]);
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style="light" />
-      {screen === 'summon' && (
-        <SummonScreen
-          debugPanel={debugPanel}
-          errorMessage={errorMessage}
-          onCast={handleCast}
-          onPromptChange={setPrompt}
-          prompt={prompt}
-        />
-      )}
-      {screen === 'loading' && <LoadingScreen debugPanel={debugPanel} prompt={prompt} />}
-      {screen === 'result' && result && (
-        <ResultScreen
-          debugPanel={debugPanel}
-          isAnimating={isAnimating}
-          onAnimate={handleAnimate}
-          onImageError={(message) => recordTraceEvent('image_render_failed', 'error', message)}
-          onImageLoad={() => recordTraceEvent('image_render_succeeded', 'completed', {
-            requestId: result.requestId,
-          })}
-          onReset={handleReset}
-          result={result}
-          videoUrl={videoUrl}
-        />
-      )}
-    </SafeAreaProvider>
+    <AppContext.Provider
+      value={{
+        prompt,
+        setPrompt,
+        result,
+        errorMessage,
+        isAnimating,
+        videoUrl,
+        currentTrace,
+        recentTraces,
+        debugEnabled,
+        handleCast,
+        handleAnimate,
+        handleReset,
+        recordTraceEvent,
+      }}
+    >
+      {children}
+    </AppContext.Provider>
   );
 }

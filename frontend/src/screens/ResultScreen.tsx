@@ -212,7 +212,7 @@ export function ResultScreen({
                 {/* Description */}
                 <View style={styles.descriptionContainer}>
                   <Text style={styles.descriptionLabel}>Description:</Text>
-                  <Text style={styles.descriptionText}>{meta.description}</Text>
+                  <Text style={styles.descriptionText}>{result.prompt}</Text>
                 </View>
               </Animated.View>
             </Animated.View>
