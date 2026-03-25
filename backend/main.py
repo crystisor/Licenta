@@ -2,11 +2,13 @@
 FastAPI backend server for the AI Video Generator.
 
 Endpoints:
-  POST /generate/ex-image - Generate image via ComfyUI + card metadata via Ollama
-  POST /generate/animate  - Animate image via Wan 2.2 I2V
-  GET  /output/{filename} - Serve generated files
+  POST /generate/ex-image                  - Generate image via ComfyUI + card metadata via Ollama
+  POST /generate/animate                   - Start video generation (returns job_id)
+  GET  /generate/animate/status/{job_id}   - Poll video generation progress
+  GET  /output/{filename}                  - Serve generated files
 """
 
+import asyncio
 import base64
 import json
 import random
@@ -49,6 +51,25 @@ OUTPUT_DIR = Path("output")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 COMFY_URL = "http://127.0.0.1:8188/"
+
+# ---------------------------------------------------------------------------
+# In-memory video job store
+# ---------------------------------------------------------------------------
+video_jobs: dict[str, dict] = {}
+JOB_EXPIRY_SECONDS = 30 * 60  # 30 minutes
+
+
+def _cleanup_expired_jobs() -> None:
+    """Remove completed/errored jobs older than JOB_EXPIRY_SECONDS."""
+    now = time.time()
+    expired = [
+        jid for jid, job in video_jobs.items()
+        if job["status"] in ("complete", "error")
+        and now - job["created_at"] > JOB_EXPIRY_SECONDS
+    ]
+    for jid in expired:
+        del video_jobs[jid]
+
 
 DEFAULT_NEGATIVE_PROMPT = (
     "low quality, worst quality, blurry, jpeg artifacts, bad anatomy, "
@@ -311,6 +332,7 @@ def _generate_video_comfy(
     image_path: Path,
     prompt: str,
     seed: int | None,
+    job_id: str | None = None,
 ) -> VideoResponse:
     _ensure_comfy()
     from comfy_script.runtime import Workflow
@@ -403,6 +425,7 @@ def _generate_video_comfy(
     # Wait for file size to stabilize before copying (moov atom is written last).
     comfy_output = get_comfy_output_dir()
     timeout = 600
+    estimated_total = 300  # ~5 min expected generation time
     poll_interval = 5
     elapsed = 0
     video_file = None
@@ -415,6 +438,10 @@ def _generate_video_comfy(
         if matches:
             video_file = matches[0]
             break
+        # Update job progress based on elapsed time (cap at 90%)
+        if job_id and job_id in video_jobs:
+            progress = min(int((elapsed / estimated_total) * 90), 90)
+            video_jobs[job_id]["progress"] = progress
         print(f"[I2V] Waiting for video file '{video_prefix}*.mp4'... ({elapsed}s)")
         time.sleep(poll_interval)
         elapsed += poll_interval
@@ -424,6 +451,10 @@ def _generate_video_comfy(
             f"No video found with prefix '{video_prefix}' after {timeout}s. "
             "Check that ComfyUI completed the workflow."
         )
+
+    # File found — update progress to 95%
+    if job_id and job_id in video_jobs:
+        video_jobs[job_id]["progress"] = 95
 
     # Wait for the file to finish writing (size stable for 3 consecutive checks)
     stable_count = 0
@@ -463,9 +494,19 @@ async def generate_image(req: GenerateImageRequest):
     return image_result
 
 
-@app.post("/generate/animate", response_model=VideoResponse)
+@app.post("/generate/animate")
 async def animate_image(req: AnimateRequest):
-    """Animate a previously generated image using Wan 2.2 I2V via ComfyUI."""
+    """Start video generation in the background. Returns a job_id for polling."""
+    _cleanup_expired_jobs()
+
+    # Reject if GPU is already busy
+    busy = any(j["status"] == "processing" for j in video_jobs.values())
+    if busy:
+        raise HTTPException(
+            status_code=409,
+            detail="A video is already being generated",
+        )
+
     image_path = OUTPUT_DIR / req.image_filename
     if not image_path.exists():
         raise HTTPException(
@@ -478,9 +519,52 @@ async def animate_image(req: AnimateRequest):
     comfy_image_path = comfy_input / req.image_filename
     shutil.copy2(image_path, comfy_image_path)
 
-    return await run_in_threadpool(
-        _generate_video_comfy, comfy_image_path, req.prompt, req.seed
-    )
+    job_id = uuid.uuid4().hex[:12]
+    video_jobs[job_id] = {
+        "status": "processing",
+        "progress": 0,
+        "video_url": None,
+        "error": None,
+        "created_at": time.time(),
+    }
+
+    async def _run_job():
+        try:
+            result = await asyncio.to_thread(
+                _generate_video_comfy, comfy_image_path, req.prompt, req.seed, job_id,
+            )
+            video_jobs[job_id]["status"] = "complete"
+            video_jobs[job_id]["progress"] = 100
+            video_jobs[job_id]["video_url"] = result.video_url
+        except Exception as e:
+            print(f"[I2V] Job {job_id} failed: {e}")
+            traceback.print_exc()
+            video_jobs[job_id]["status"] = "error"
+            video_jobs[job_id]["error"] = str(e)
+
+    asyncio.create_task(_run_job())
+    return {"job_id": job_id}
+
+
+@app.get("/generate/animate/status/{job_id}")
+async def animate_status(job_id: str):
+    """Poll the status of a video generation job."""
+    _cleanup_expired_jobs()
+
+    job = video_jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job["status"] == "processing":
+        return {"status": "processing", "progress": job["progress"]}
+    elif job["status"] == "complete":
+        return {
+            "status": "complete",
+            "progress": 100,
+            "video_url": job["video_url"],
+        }
+    else:
+        return {"status": "error", "detail": job["error"]}
 
 
 @app.get("/output/{filename}")

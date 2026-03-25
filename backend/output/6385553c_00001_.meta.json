@@ -1,0 +1,10 @@
+{
+  "title": "Elric, the Silverhaired Mage",
+  "lore": "He stands sentinel on the precipice, staff glowing with ancient magic, his silver hair a beacon in the twilight. The world trembles at his command.",
+  "stats": {
+    "Strength": 4,
+    "Magic": 8,
+    "Defense": 6,
+    "Agility": 5
+  }
+}
