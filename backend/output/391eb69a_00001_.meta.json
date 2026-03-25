@@ -1,0 +1,10 @@
+{
+  "title": "Aelir, the Green-Eyed Necromancer",
+  "lore": "She walks among the skeletal remains, her pale hands glowing with ancient magic. The fog whispers of her cursed elven blood and the spirits she commands.",
+  "stats": {
+    "Strength": 4,
+    "Magic": 8,
+    "Defense": 5,
+    "Agility": 6
+  }
+}

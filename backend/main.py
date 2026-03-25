@@ -2,10 +2,13 @@
 FastAPI backend server for the AI Video Generator.
 
 Endpoints:
-  POST /generate/image    - Generate image via ComfyUI (comfy_script)
+  POST /generate/ex-image - Generate image via ComfyUI + card metadata via Ollama
+  POST /generate/animate  - Animate image via Wan 2.2 I2V
   GET  /output/{filename} - Serve generated files
 """
 
+import base64
+import json
 import random
 import shutil
 import time
@@ -13,6 +16,7 @@ import traceback
 import uuid
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
@@ -78,8 +82,15 @@ class GenerateImageRequest(BaseModel):
     seed: int | None = None
 
 
+class CardMeta(BaseModel):
+    title: str
+    lore: str
+    stats: dict[str, int]
+
+
 class ImageResponse(BaseModel):
     image_urls: list[str]
+    card_meta: CardMeta | None = None
 
 
 class AnimateRequest(BaseModel):
@@ -149,6 +160,137 @@ def _generate_image_comfy(req: GenerateImageRequest) -> ImageResponse:
         filenames.append(src.name)
 
     return ImageResponse(image_urls=[f"/output/{f}" for f in filenames])
+
+
+# ---------------------------------------------------------------------------
+# Card metadata generation via Ollama (Qwen2.5-VL 7B)
+# ---------------------------------------------------------------------------
+OLLAMA_URL = "http://localhost:11434/api/chat"
+OLLAMA_MODEL = "qwen2.5vl:7b"
+
+CARD_META_SYSTEM_PROMPT = """You are a fantasy lore writer for a collectible card game.
+Analyze the provided character image and return a JSON object with three fields.
+
+## Output Format (strict JSON, no markdown)
+{
+  "title": "<character name>, <short epithet>",
+  "lore": "<2-3 sentence fantasy flavor text>",
+  "stats": {
+    "Strength": <1-10>,
+    "Magic": <1-10>,
+    "Defense": <1-10>,
+    "Agility": <1-10>
+  }
+}
+
+## Rules for "title"
+- Invent a fantasy-appropriate name (not from existing fiction)
+- Add a short epithet after a comma: "Kaelith, the Ashborne"
+- Keep under 35 characters total
+
+## Rules for "lore"
+- Write in third person, past or present tense
+- Mystical, epic tone — like flavor text on a Magic: The Gathering card
+- You MUST reference at least one specific visual detail from the image (armor, weapon, environment, expression, colors)
+- Do NOT describe the image technically — narrate the character's story
+- Keep under 50 words
+- No quotes around the text
+
+## Rules for "stats"
+- Each stat is an integer from 1 to 10
+- Base the stats on what you see: heavy armor = high Defense, staff/runes = high Magic, etc.
+- Not every character is strong in everything — create contrast
+
+## Examples
+
+Input: An image of a dark elf in leather armor with twin daggers, crouching in a moonlit forest.
+Output:
+{
+  "title": "Syvra, Fang of the Eclipse",
+  "lore": "She moves between the silver birches like a rumor, her twin blades drinking moonlight. The forest remembers every throat they have opened.",
+  "stats": {"Strength": 5, "Magic": 3, "Defense": 4, "Agility": 9}
+}
+
+Input: An image of a hulking orc shaman surrounded by glowing green spirits, holding a gnarled staff.
+Output:
+{
+  "title": "Grul'thar, the Spiritbound",
+  "lore": "The ancestors speak through him in tongues of emerald flame. Each spirit he summons carries the weight of a century's rage, and he bears them all without flinching.",
+  "stats": {"Strength": 7, "Magic": 9, "Defense": 6, "Agility": 3}
+}
+
+The user's original prompt is provided for context, but focus on what you SEE in the image."""
+
+
+def _fallback_meta(original_prompt: str) -> dict:
+    """Return placeholder metadata when Ollama is unavailable."""
+    return {
+        "title": "The Unnamed",
+        "lore": (
+            f'A vision born from the words: "{original_prompt[:80]}". '
+            "The full story remains unwritten."
+        ),
+        "stats": {
+            "Strength": 5,
+            "Magic": 5,
+            "Defense": 5,
+            "Agility": 5,
+        },
+    }
+
+
+async def _generate_card_meta(image_path: Path, original_prompt: str) -> dict:
+    """Call Ollama to generate card metadata from the image."""
+
+    # Check for cached sidecar
+    meta_path = image_path.with_suffix(".meta.json")
+    if meta_path.exists():
+        try:
+            return json.loads(meta_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    image_b64 = base64.b64encode(image_path.read_bytes()).decode("utf-8")
+
+    payload = {
+        "model": OLLAMA_MODEL,
+        "messages": [
+            {"role": "system", "content": CARD_META_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": (
+                    f"Original prompt: {original_prompt}\n\n"
+                    "Generate the card metadata for this character."
+                ),
+                "images": [image_b64],
+            },
+        ],
+        "format": "json",
+        "stream": False,
+        "keep_alive": 0,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(OLLAMA_URL, json=payload)
+            response.raise_for_status()
+
+        content = response.json()["message"]["content"]
+        parsed = json.loads(content)
+
+        # Validate expected keys
+        for key in ("title", "lore", "stats"):
+            if key not in parsed:
+                raise ValueError(f"Missing key in Ollama response: {key}")
+
+        # Cache to sidecar file
+        meta_path.write_text(json.dumps(parsed, indent=2))
+        print(f"[LORE] Generated card meta for {image_path.name}: {parsed['title']}")
+        return parsed
+
+    except Exception as e:
+        print(f"[LORE] Ollama card meta generation failed: {e}")
+        return _fallback_meta(original_prompt)
 
 
 # ---------------------------------------------------------------------------
@@ -309,8 +451,16 @@ def _generate_video_comfy(
 # ---------------------------------------------------------------------------
 @app.post("/generate/ex-image", response_model=ImageResponse)
 async def generate_image(req: GenerateImageRequest):
-    """Generate an image from a text prompt via ComfyUI."""
-    return await run_in_threadpool(_generate_image_comfy, req)
+    """Generate an image from a text prompt via ComfyUI, then generate card metadata via Ollama."""
+    image_result = await run_in_threadpool(_generate_image_comfy, req)
+
+    # Generate card metadata from the first image
+    first_filename = image_result.image_urls[0].split("/")[-1]
+    first_image_path = OUTPUT_DIR / first_filename
+    meta = await _generate_card_meta(first_image_path, req.prompt)
+    image_result.card_meta = CardMeta(**meta)
+
+    return image_result
 
 
 @app.post("/generate/animate", response_model=VideoResponse)
