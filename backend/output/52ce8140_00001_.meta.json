@@ -1,0 +1,10 @@
+{
+  "title": "Gorgon, the Horned Guardian",
+  "lore": "In the misty forest, the Horned Guardian roars, his glowing eyes piercing the darkness. His scales shimmer with ancient magic, and his horns pierce the sky.",
+  "stats": {
+    "Strength": 10,
+    "Magic": 7,
+    "Defense": 9,
+    "Agility": 5
+  }
+}

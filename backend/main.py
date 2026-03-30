@@ -134,9 +134,12 @@ def _generate_image_comfy(req: GenerateImageRequest) -> ImageResponse:
         CheckpointLoaderSimple,
         CLIPTextEncode,
         EmptyLatentImage,
+        ImageScale,
+        ImageUpscaleWithModel,
         KSampler,
         LoraLoaderModelOnly,
         SaveImage,
+        UpscaleModelLoader,
         VAEDecode,
     )
 
@@ -163,6 +166,9 @@ def _generate_image_comfy(req: GenerateImageRequest) -> ImageResponse:
             latent, 1,
         )
         image = VAEDecode(latent, vae)
+        upscale_model = UpscaleModelLoader("4xUltrasharp_4xUltrasharpV10.pt")
+        image = ImageUpscaleWithModel(upscale_model, image)
+        image = ImageScale(image, "nearest-exact", 2048, 2048, "disabled")
         SaveImage(image, batch_id)
 
     # Collect saved images from ComfyUI output dir and copy to our output dir

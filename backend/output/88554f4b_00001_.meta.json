@@ -1,0 +1,10 @@
+{
+  "title": "Whisker, the Feline Sentinel",
+  "lore": "She watches over the hearth with a keen eye, her stripes a tapestry of ancient wisdom. The house whispers of her silent vigil.",
+  "stats": {
+    "Strength": 2,
+    "Magic": 1,
+    "Defense": 8,
+    "Agility": 7
+  }
+}

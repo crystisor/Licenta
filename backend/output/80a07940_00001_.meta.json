@@ -1,0 +1,10 @@
+{
+  "title": "Malith, the Shadowweaver",
+  "lore": "In the ruins of the ancient temple, he weaves shadows and arcane power, his eyes glowing with forbidden knowledge. The mist whispers of his secrets.",
+  "stats": {
+    "Strength": 2,
+    "Magic": 8,
+    "Defense": 4,
+    "Agility": 5
+  }
+}
