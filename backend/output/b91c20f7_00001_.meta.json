@@ -1,0 +1,10 @@
+{
+  "title": "Aryanna, Dragon's Flight",
+  "lore": "She commands the sky with a fierce grip on the reins, her golden armor gleaming against the fiery wings of her dragon. The mountains below whisper of ancient battles fought in the shadows.",
+  "stats": {
+    "Strength": 8,
+    "Magic": 2,
+    "Defense": 9,
+    "Agility": 7
+  }
+}

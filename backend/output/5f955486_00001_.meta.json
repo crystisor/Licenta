@@ -1,0 +1,10 @@
+{
+  "title": "Aldric, the Arcane Tyrant",
+  "lore": "In the shadowed ruins, he weaves the very fabric of reality, his eyes glowing with forbidden knowledge. The ancient stones tremble under his arcane touch.",
+  "stats": {
+    "Strength": 4,
+    "Magic": 8,
+    "Defense": 5,
+    "Agility": 6
+  }
+}

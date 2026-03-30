@@ -1,0 +1,10 @@
+{
+  "title": "Aeloria, the Forest Guardian",
+  "lore": "She stands as a beacon of the ancient woods, her antler crown and glowing eyes piercing the mist. With her staff and vines, she weaves the forest's secrets into her very being.",
+  "stats": {
+    "Strength": 6,
+    "Magic": 8,
+    "Defense": 7,
+    "Agility": 5
+  }
+}

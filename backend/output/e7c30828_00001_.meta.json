@@ -1,0 +1,10 @@
+{
+  "title": "Necron, the Bone King",
+  "lore": "He sits upon his throne of shattered stone, his glowing blue eyes piercing the darkness. The cold mist whispers of his ancient power, and the ruins around him echo with his commands.",
+  "stats": {
+    "Strength": 8,
+    "Magic": 7,
+    "Defense": 9,
+    "Agility": 2
+  }
+}

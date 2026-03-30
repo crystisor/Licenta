@@ -1,0 +1,10 @@
+{
+  "title": "Aldric, the Steelheart",
+  "lore": "He stands as a beacon of honor amidst the ruins, his steel armor gleaming under the golden hour sun. The embers in the air whisper of battles past, and his gaze is a storm of resolve.",
+  "stats": {
+    "Strength": 8,
+    "Magic": 2,
+    "Defense": 9,
+    "Agility": 6
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "title": "Aeloria, the Mossweaver",
+  "lore": "She emerges from the forest's embrace, her mossy form a living tapestry of nature's secrets. Fireflies dance around her, whispering tales of the ancient trees she guards.",
+  "stats": {
+    "Strength": 2,
+    "Magic": 8,
+    "Defense": 4,
+    "Agility": 7
+  }
+}

@@ -16,6 +16,7 @@ export function GalleryScreen() {
 
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [backHovered, setBackHovered] = useState(false);
 
   const loadEntries = useCallback(async () => {
     const rows = await getEntries(PAGE_SIZE, 0);
@@ -77,13 +78,19 @@ export function GalleryScreen() {
     >
       <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable
+            onPress={() => router.back()}
+            onHoverIn={() => setBackHovered(true)}
+            onHoverOut={() => setBackHovered(false)}
+            style={({ pressed }) => [
+              styles.backButton,
+              backHovered && styles.backButtonHovered,
+              pressed && styles.backButtonPressed,
+            ]}
+          >
             <Text style={styles.backText}>Back</Text>
           </Pressable>
-          <View>
-            <Text style={styles.title}>Gallery</Text>
-            <Text style={styles.subtitle}>Your past generations</Text>
-          </View>
+          <Text style={styles.title}>Gallery</Text>
         </View>
 
         {entries.length === 0 ? (
@@ -128,25 +135,34 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   backButton: {
-    paddingVertical: 8,
-    paddingRight: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(184, 160, 255, 0.25)',
+    backgroundColor: 'rgba(184, 160, 255, 0.08)',
+  },
+  backButtonHovered: {
+    backgroundColor: 'rgba(184, 160, 255, 0.18)',
+    borderColor: theme.colors.primaryStrong,
+  },
+  backButtonPressed: {
+    transform: [{ scale: 0.96 }],
+    backgroundColor: 'rgba(184, 160, 255, 0.25)',
   },
   backText: {
     color: theme.colors.primary,
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   title: {
+    flex: 1,
     color: theme.colors.text,
     fontSize: 22,
     fontWeight: '800',
     letterSpacing: 1,
-  },
-  subtitle: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    letterSpacing: 0.5,
-    marginTop: 2,
+    textAlign: 'center',
+    marginRight: 56,
   },
   list: {
     paddingHorizontal: 10,

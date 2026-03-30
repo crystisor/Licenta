@@ -1,0 +1,10 @@
+{
+  "title": "Graal, the Horned Guardian",
+  "lore": "A beast of ancient forest lore, its glowing eyes pierce the mist. With horns of stone and fangs of ice, it stands as a guardian of the forgotten ruins.",
+  "stats": {
+    "Strength": 10,
+    "Magic": 2,
+    "Defense": 8,
+    "Agility": 5
+  }
+}
