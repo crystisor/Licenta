@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { theme } from '../theme';
 import { CardMeta, GeneratedImage } from '../types';
+import { MOTION_SUGGESTIONS } from '../data/promptTemplates';
 
 const FALLBACK_META: CardMeta = {
   title: 'The Unnamed',
@@ -41,6 +42,7 @@ interface ResultScreenProps {
   onImageLoad?: () => void;
   onImageError?: (message: string) => void;
   debugPanel?: ReactNode;
+  fromHistory?: boolean;
 }
 
 export function ResultScreen({
@@ -53,6 +55,7 @@ export function ResultScreen({
   onImageLoad,
   onImageError,
   debugPanel,
+  fromHistory = false,
 }: ResultScreenProps) {
   const imageSettledRef = useRef(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -79,6 +82,26 @@ export function ResultScreen({
   });
 
   useEffect(() => {
+    if (fromHistory) {
+      // Simple fade-in for history replay — no card flip
+      flipAnim.setValue(1080);
+      scaleAnim.setValue(1);
+      cardFaceOpacity.setValue(1);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
+
     // Fade + slide in the page, start flipping immediately
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -250,41 +273,65 @@ export function ResultScreen({
               </Text>
             </View>
 
-            {/* ── Animate Section ── */}
-            <View style={styles.animateCard}>
-              <Text style={styles.animateTitle}>Animate</Text>
-              <Text style={styles.animateSubtitle}>
-                {videoJobActive ? 'Video already generating...' : 'Bring this image to life'}
-              </Text>
-              <TextInput
-                style={styles.motionInput}
-                placeholder="Describe the motion (e.g. camera slowly zooms in, wind blows hair...)"
-                placeholderTextColor={theme.colors.textMuted}
-                value={motionPrompt}
-                onChangeText={setMotionPrompt}
-                multiline
-                numberOfLines={3}
-                editable={!isAnimating && !videoJobActive}
-              />
-              <Pressable
-                onPress={() => onAnimate(motionPrompt)}
-                disabled={isAnimating || videoJobActive || !motionPrompt.trim()}
-                style={({ pressed }) => [
-                  styles.animateButton,
-                  pressed && styles.animateButtonPressed,
-                  (isAnimating || videoJobActive || !motionPrompt.trim()) && styles.animateButtonDisabled,
-                ]}
-              >
-                {isAnimating ? (
-                  <View style={styles.animateButtonContent}>
-                    <ActivityIndicator size="small" color={theme.colors.text} />
-                    <Text style={styles.animateButtonText}>Starting...</Text>
-                  </View>
-                ) : (
-                  <Text style={styles.animateButtonText}>Animate</Text>
-                )}
-              </Pressable>
-            </View>
+            {/* ── Animate Section (hidden in history replay) ── */}
+            {!fromHistory && (
+              <View style={styles.animateCard}>
+                <Text style={styles.animateTitle}>Animate</Text>
+                <Text style={styles.animateSubtitle}>
+                  {videoJobActive ? 'Video already generating...' : 'Bring this image to life'}
+                </Text>
+                <TextInput
+                  style={styles.motionInput}
+                  placeholder="Describe the motion (e.g. camera slowly zooms in, wind blows hair...)"
+                  placeholderTextColor={theme.colors.textMuted}
+                  value={motionPrompt}
+                  onChangeText={setMotionPrompt}
+                  multiline
+                  numberOfLines={3}
+                  editable={!isAnimating && !videoJobActive}
+                />
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.motionChipRow}
+                >
+                  {MOTION_SUGGESTIONS.map((suggestion) => (
+                    <Pressable
+                      key={suggestion}
+                      onPress={() => setMotionPrompt(suggestion)}
+                      disabled={isAnimating || videoJobActive}
+                      style={[
+                        styles.motionChip,
+                        motionPrompt === suggestion && styles.motionChipActive,
+                      ]}
+                    >
+                      <Text style={[
+                        styles.motionChipText,
+                        motionPrompt === suggestion && styles.motionChipTextActive,
+                      ]}>{suggestion}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <Pressable
+                  onPress={() => onAnimate(motionPrompt)}
+                  disabled={isAnimating || videoJobActive || !motionPrompt.trim()}
+                  style={({ pressed }) => [
+                    styles.animateButton,
+                    pressed && styles.animateButtonPressed,
+                    (isAnimating || videoJobActive || !motionPrompt.trim()) && styles.animateButtonDisabled,
+                  ]}
+                >
+                  {isAnimating ? (
+                    <View style={styles.animateButtonContent}>
+                      <ActivityIndicator size="small" color={theme.colors.text} />
+                      <Text style={styles.animateButtonText}>Starting...</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.animateButtonText}>Animate</Text>
+                  )}
+                </Pressable>
+              </View>
+            )}
 
             {/* ── Video Player ── */}
             {videoUrl && (
@@ -311,7 +358,9 @@ export function ResultScreen({
                 pressed && styles.buttonPressed,
               ]}
             >
-              <Text style={styles.buttonText}>Generate Another</Text>
+              <Text style={styles.buttonText}>
+                {fromHistory ? 'Back to Gallery' : 'Generate Another'}
+              </Text>
             </Pressable>
 
             {debugPanel}
@@ -581,6 +630,31 @@ const styles = StyleSheet.create({
     padding: 14,
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+  motionChipRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 8,
+  },
+  motionChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: theme.radius.pill,
+    backgroundColor: 'rgba(184, 160, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(184, 160, 255, 0.2)',
+  },
+  motionChipActive: {
+    borderColor: theme.colors.primaryStrong,
+    backgroundColor: 'rgba(184, 160, 255, 0.18)',
+  },
+  motionChipText: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  motionChipTextActive: {
+    color: theme.colors.text,
   },
   animateButton: {
     minHeight: 48,

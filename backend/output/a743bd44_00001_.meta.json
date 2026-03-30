@@ -1,0 +1,10 @@
+{
+  "title": "Aeloria, the Forest Weaver",
+  "lore": "She weaves the very fabric of the forest, her antlered crown and glowing eyes reflecting the ancient magic that flows through the misty glade. The earth whispers to her, and her staff is the voice of the trees.",
+  "stats": {
+    "Strength": 6,
+    "Magic": 8,
+    "Defense": 5,
+    "Agility": 7
+  }
+}

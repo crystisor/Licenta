@@ -1,8 +1,10 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
 import { ScreenShell } from '../components/ScreenShell';
 import { theme } from '../theme';
+import { PROMPT_TEMPLATES, pickRandom } from '../data/promptTemplates';
 
 interface SummonScreenProps {
   prompt: string;
@@ -12,8 +14,6 @@ interface SummonScreenProps {
   debugPanel?: ReactNode;
 }
 
-const STATUS_PILLS: string[] = [];
-
 export function SummonScreen({
   prompt,
   errorMessage,
@@ -21,6 +21,21 @@ export function SummonScreen({
   onCast,
   debugPanel,
 }: SummonScreenProps) {
+  const router = useRouter();
+  const [activeCategory, setActiveCategory] = useState<number | null>(null);
+
+  const handleShuffle = () => {
+    const category = pickRandom(PROMPT_TEMPLATES);
+    const idx = PROMPT_TEMPLATES.indexOf(category);
+    setActiveCategory(idx);
+    onPromptChange(pickRandom(category.prompts));
+  };
+
+  const handleChipPress = (index: number) => {
+    setActiveCategory(index);
+    onPromptChange(pickRandom(PROMPT_TEMPLATES[index].prompts));
+  };
+
   return (
     <ScreenShell
       eyebrow="AI Cards"
@@ -33,11 +48,24 @@ export function SummonScreen({
         style={styles.wrapper}
       >
         <View style={styles.card}>
-          <View style={styles.pillRow}>
-            {STATUS_PILLS.map((pill) => (
-              <View key={pill} style={styles.pill}>
-                <Text style={styles.pillText}>{pill}</Text>
-              </View>
+          <View style={styles.chipRow}>
+            <Pressable onPress={handleShuffle} style={styles.shuffleButton}>
+              <Text style={styles.shuffleText}>Shuffle</Text>
+            </Pressable>
+            {PROMPT_TEMPLATES.map((tmpl, idx) => (
+              <Pressable
+                key={tmpl.label}
+                onPress={() => handleChipPress(idx)}
+                style={[
+                  styles.pill,
+                  activeCategory === idx && styles.pillActive,
+                ]}
+              >
+                <Text style={[
+                  styles.pillText,
+                  activeCategory === idx && styles.pillTextActive,
+                ]}>{tmpl.label}</Text>
+              </Pressable>
             ))}
           </View>
 
@@ -73,6 +101,16 @@ export function SummonScreen({
           >
             <Text style={styles.buttonText}>Generate image</Text>
           </Pressable>
+
+          <Pressable
+            onPress={() => router.push('/gallery')}
+            style={({ pressed }) => [
+              styles.galleryButton,
+              pressed && styles.galleryButtonPressed,
+            ]}
+          >
+            <Text style={styles.galleryButtonText}>Gallery</Text>
+          </Pressable>
         </View>
         {debugPanel}
       </KeyboardAvoidingView>
@@ -101,10 +139,23 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 14 },
     elevation: 10,
   },
-  pillRow: {
+  chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  shuffleButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: theme.radius.pill,
+    backgroundColor: 'rgba(74, 248, 227, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(74, 248, 227, 0.35)',
+  },
+  shuffleText: {
+    color: theme.colors.accent,
+    fontSize: 12,
+    fontWeight: '700',
   },
   pill: {
     paddingHorizontal: 12,
@@ -114,10 +165,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(184, 160, 255, 0.22)',
   },
+  pillActive: {
+    borderColor: theme.colors.primaryStrong,
+    backgroundColor: 'rgba(184, 160, 255, 0.2)',
+  },
   pillText: {
     color: theme.colors.primary,
     fontSize: 12,
     fontWeight: '700',
+  },
+  pillTextActive: {
+    color: theme.colors.text,
   },
   label: {
     color: theme.colors.text,
@@ -175,6 +233,26 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 1.1,
+  },
+  galleryButton: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(184, 160, 255, 0.3)',
+    backgroundColor: 'rgba(184, 160, 255, 0.08)',
+  },
+  galleryButtonPressed: {
+    transform: [{ scale: 0.98 }],
+    backgroundColor: 'rgba(184, 160, 255, 0.15)',
+  },
+  galleryButtonText: {
+    color: theme.colors.primary,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   footer: {
     color: theme.colors.textMuted,

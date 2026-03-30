@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useState } from 'react';
 import { useRouter } from 'expo-router';
+import * as Crypto from 'expo-crypto';
 
 import {
   appendTraceEvents,
@@ -10,6 +11,8 @@ import {
   trackFrontendEvent,
 } from '../debugFlow';
 import { animateImage, EX_IMAGE_ENDPOINT, generateImage, ImageGenerationError } from '../services/api';
+import { insertEntry, updateVideo } from '../storage/historyDb';
+import { cacheImage, cacheVideo, createThumbnail } from '../storage/mediaCache';
 import { DebugTraceRecord, GeneratedImage } from '../types';
 
 const MIN_LOADING_MS = 1400;
@@ -33,7 +36,7 @@ interface AppContextValue {
   currentTrace: DebugTraceRecord | null;
   recentTraces: DebugTraceRecord[];
   debugEnabled: boolean;
-  setVideoUrl: (url: string | null) => void;
+  setVideoUrl: (url: string | null) => void | Promise<void>;
   setVideoJobId: (id: string | null) => void;
   handleCast: () => Promise<void>;
   handleAnimate: (motionPrompt: string) => Promise<void>;
@@ -53,16 +56,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   const [result, setResult] = useState<GeneratedImage | null>(null);
+  const [currentEntryId, setCurrentEntryId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoUrl, setVideoUrlRaw] = useState<string | null>(null);
   const [videoJobId, setVideoJobId] = useState<string | null>(null);
   const [motionPrompt, setMotionPrompt] = useState('');
   const [currentTrace, setCurrentTrace] = useState<DebugTraceRecord | null>(null);
   const [recentTraces, setRecentTraces] = useState<DebugTraceRecord[]>([]);
 
   const videoJobActive = videoJobId !== null && videoUrl === null;
+
+  const setVideoUrl = useCallback(async (url: string | null) => {
+    setVideoUrlRaw(url);
+    if (url && currentEntryId) {
+      try {
+        const localVideo = await cacheVideo(url, currentEntryId);
+        await updateVideo(currentEntryId, localVideo, motionPrompt);
+      } catch (err) {
+        console.warn('Failed to save video to history:', err);
+      }
+    }
+  }, [currentEntryId, motionPrompt]);
 
   const debugEnabled = isDebugFlowEnabled();
 
@@ -125,6 +141,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
         imageUrl: nextImage.imageUrl,
       });
 
+      // Save to history (non-blocking — failures don't affect the UX)
+      try {
+        const entryId = Crypto.randomUUID();
+        const localImage = await cacheImage(nextImage.imageUrl, entryId);
+        const localThumb = await createThumbnail(localImage, entryId);
+        await insertEntry({
+          id: entryId,
+          prompt: trimmedPrompt,
+          imageUri: localImage,
+          thumbnailUri: localThumb,
+          cardMeta: nextImage.cardMeta,
+          videoUri: null,
+          motionPrompt: null,
+          createdAt: Date.now(),
+        });
+        setCurrentEntryId(entryId);
+      } catch (saveErr) {
+        console.warn('Failed to save generation to history:', saveErr);
+      }
+
       const elapsed = Date.now() - startedAt;
       if (elapsed < MIN_LOADING_MS) {
         await sleep(MIN_LOADING_MS - elapsed);
@@ -174,10 +210,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setResult(null);
     setPrompt('');
     setErrorMessage(null);
-    setVideoUrl(null);
+    setVideoUrlRaw(null);
     setVideoJobId(null);
     setMotionPrompt('');
     setIsAnimating(false);
+    setCurrentEntryId(null);
     router.replace('/home');
   }, [router]);
 

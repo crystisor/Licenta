@@ -26,6 +26,17 @@ export interface DebugTraceRecord {
   events: DebugTraceEvent[];
 }
 
+export interface HistoryEntry {
+  id: string;
+  prompt: string;
+  imageUri: string;
+  thumbnailUri: string;
+  cardMeta: CardMeta | null;
+  videoUri: string | null;
+  motionPrompt: string | null;
+  createdAt: number;
+}
+
 export type VideoJobStatus = 'processing' | 'complete' | 'error';
 
 export interface AnimateResponse {

@@ -1,0 +1,10 @@
+{
+  "title": "Aurelian, Radiant Guardian",
+  "lore": "A celestial knight descends from the heavens, his golden armor glowing with divine light. His wings spread wide, he holds a luminous sword, ready to protect the realm.",
+  "stats": {
+    "Strength": 8,
+    "Magic": 7,
+    "Defense": 9,
+    "Agility": 6
+  }
+}
