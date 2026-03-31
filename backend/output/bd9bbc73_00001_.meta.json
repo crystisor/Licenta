@@ -1,0 +1,12 @@
+{
+  "title": "Elara, the Whispering Huntress",
+  "lore": "She moves like a ghost through the ancient woods, her bow ready to strike. The mist whispers her name, and the trees bow to her silent command.",
+  "stats": {
+    "Strength": 6,
+    "Magic": 2,
+    "Defense": 7,
+    "Agility": 9
+  },
+  "creativity": 8,
+  "prompt": "Elven ranger standing silently in a dense forest, slender agile figure, sharp features, long flowing hair, pointed ears, wearing leather armor and a hooded cloak, holding a finely crafted bow, quiver of arrows on back, alert stance scanning surroundings, ancient trees and soft mist, shafts of light filtering through leaves, natural green and earthy tones, cinematic composition, medium shot, soft diffused lighting, high resolution, detailed skin and fabric texture, sharp focus, calm focused expression, serene yet vigilant atmosphere, realistic style, bad hands, bad eyes"
+}

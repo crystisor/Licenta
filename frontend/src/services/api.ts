@@ -11,6 +11,7 @@ interface ImageResponsePayload {
     title: string;
     lore: string;
     stats: Record<string, number>;
+    creativity?: number;
   } | null;
 }
 
@@ -144,7 +145,7 @@ export async function generateImage(prompt: string, requestId: string): Promise<
   }
 
   const cardMeta: CardMeta | null = payload.card_meta
-    ? { title: payload.card_meta.title, lore: payload.card_meta.lore, stats: payload.card_meta.stats }
+    ? { title: payload.card_meta.title, lore: payload.card_meta.lore, stats: payload.card_meta.stats, creativity: payload.card_meta.creativity }
     : null;
 
   return {

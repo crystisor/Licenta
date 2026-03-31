@@ -17,7 +17,7 @@ function formatDate(epoch: number): string {
 
 export function GalleryCard({ entry, onPress, onLongPress }: GalleryCardProps) {
   const title = entry.card_meta?.title ?? 'Untitled';
-  const rarityInfo = entry.card_meta?.stats ? getRarity(entry.card_meta.stats) : null;
+  const rarityInfo = entry.card_meta?.stats ? getRarity(entry.card_meta.stats, entry.card_meta.creativity) : null;
 
   return (
     <Pressable

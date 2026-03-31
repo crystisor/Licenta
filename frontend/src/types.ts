@@ -2,6 +2,7 @@ export interface CardMeta {
   title: string;
   lore: string;
   stats: Record<string, number>;
+  creativity?: number;  // 1-10, prompt originality score from LLM
 }
 
 export interface GeneratedImage {

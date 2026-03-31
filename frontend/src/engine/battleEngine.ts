@@ -13,7 +13,7 @@ function randomInt(min: number, max: number): number {
 
 export function createBattleCardFromGallery(entry: GalleryEntry): BattleCard | null {
   if (!entry.card_meta?.stats) return null;
-  const { rarity } = getRarity(entry.card_meta.stats);
+  const { rarity } = getRarity(entry.card_meta.stats, entry.card_meta.creativity);
   return {
     id: entry.id,
     title: entry.card_meta.title,

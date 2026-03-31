@@ -171,7 +171,7 @@ export function ResultScreen({
 
   const meta = result.cardMeta ?? FALLBACK_META;
   const statEntries = Object.entries(meta.stats);
-  const rarityInfo: RarityInfo = getRarity(meta.stats);
+  const rarityInfo: RarityInfo = getRarity(meta.stats, meta.creativity);
 
   return (
     <LinearGradient
@@ -702,11 +702,12 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.lg,
     borderWidth: 1,
     borderColor: theme.colors.panelBorder,
-    padding: 20,
-    gap: 12,
+    overflow: 'hidden',
   },
   videoTitle: {
     color: theme.colors.primary,
+    paddingHorizontal: 20,
+    paddingTop: 16,
     fontSize: 20,
     fontWeight: '700',
     letterSpacing: 2,
@@ -715,8 +716,6 @@ const styles = StyleSheet.create({
   videoContainer: {
     width: '100%',
     aspectRatio: 1,
-    borderRadius: theme.radius.sm,
-    overflow: 'hidden',
     backgroundColor: theme.colors.panel,
   },
   videoPlayer: {

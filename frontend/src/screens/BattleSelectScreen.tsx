@@ -89,7 +89,7 @@ export function BattleSelectScreen() {
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => {
               const isSelected = item.id === selectedId;
-              const rarity = getRarity(item.card_meta!.stats);
+              const rarity = getRarity(item.card_meta!.stats, item.card_meta!.creativity);
               return (
                 <Pressable
                   onPress={() => setSelectedId(item.id)}

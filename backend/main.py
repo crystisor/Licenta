@@ -107,6 +107,7 @@ class CardMeta(BaseModel):
     title: str
     lore: str
     stats: dict[str, int]
+    creativity: int = 5
 
 
 class ImageResponse(BaseModel):
@@ -196,7 +197,7 @@ OLLAMA_URL = "http://localhost:11434/api/chat"
 OLLAMA_MODEL = "qwen2.5vl:7b"
 
 CARD_META_SYSTEM_PROMPT = """You are a fantasy lore writer for a collectible card game.
-Analyze the provided character image and return a JSON object with three fields.
+Analyze the provided character image and the user's original prompt, then return a JSON object.
 
 ## Output Format (strict JSON, no markdown)
 {
@@ -207,7 +208,8 @@ Analyze the provided character image and return a JSON object with three fields.
     "Magic": <1-10>,
     "Defense": <1-10>,
     "Agility": <1-10>
-  }
+  },
+  "creativity": <1-10>
 }
 
 ## Rules for "title"
@@ -228,25 +230,37 @@ Analyze the provided character image and return a JSON object with three fields.
 - Base the stats on what you see: heavy armor = high Defense, staff/runes = high Magic, etc.
 - Not every character is strong in everything — create contrast
 
+## Rules for "creativity"
+- Rate how creative, original, and imaginative the user's prompt is on a scale of 1 to 10
+- 1-3: Generic or cliché concepts (e.g. "a knight", "a wizard with a staff")
+- 4-6: Decent concept with some unique elements (e.g. "an elven necromancer in a frozen swamp")
+- 7-8: Highly original concept with vivid details (e.g. "a blind oracle whose tears turn to gemstones, sitting in a cathedral made of whale bones")
+- 9-10: Exceptionally imaginative and unprecedented (e.g. "a sentient aurora borealis that has taken humanoid form, wearing armor woven from gravitational waves")
+- Judge the PROMPT, not the image — reward unusual combinations, specific details, and imaginative worldbuilding
+
 ## Examples
 
 Input: An image of a dark elf in leather armor with twin daggers, crouching in a moonlit forest.
+Prompt: "a dark elf assassin in a moonlit forest"
 Output:
 {
   "title": "Syvra, Fang of the Eclipse",
   "lore": "She moves between the silver birches like a rumor, her twin blades drinking moonlight. The forest remembers every throat they have opened.",
-  "stats": {"Strength": 5, "Magic": 3, "Defense": 4, "Agility": 9}
+  "stats": {"Strength": 5, "Magic": 3, "Defense": 4, "Agility": 9},
+  "creativity": 3
 }
 
 Input: An image of a hulking orc shaman surrounded by glowing green spirits, holding a gnarled staff.
+Prompt: "an orc shaman who channels ancestor spirits through emerald flame, scarred from a ritual that bound his soul to theirs"
 Output:
 {
   "title": "Grul'thar, the Spiritbound",
   "lore": "The ancestors speak through him in tongues of emerald flame. Each spirit he summons carries the weight of a century's rage, and he bears them all without flinching.",
-  "stats": {"Strength": 7, "Magic": 9, "Defense": 6, "Agility": 3}
+  "stats": {"Strength": 7, "Magic": 9, "Defense": 6, "Agility": 3},
+  "creativity": 7
 }
 
-The user's original prompt is provided for context, but focus on what you SEE in the image."""
+The user's original prompt is provided for context. Base stats on what you SEE in the image, but base creativity on the PROMPT text."""
 
 
 def _fallback_meta(original_prompt: str) -> dict:
@@ -263,6 +277,7 @@ def _fallback_meta(original_prompt: str) -> dict:
             "Defense": 5,
             "Agility": 5,
         },
+        "creativity": 5,
     }
 
 
@@ -309,6 +324,11 @@ async def _generate_card_meta(image_path: Path, original_prompt: str) -> dict:
         for key in ("title", "lore", "stats"):
             if key not in parsed:
                 raise ValueError(f"Missing key in Ollama response: {key}")
+
+        # Ensure creativity score exists and is clamped to 1-10
+        creativity = parsed.get("creativity")
+        if not isinstance(creativity, (int, float)) or not (1 <= creativity <= 10):
+            parsed["creativity"] = 5
 
         # Include the original prompt in the metadata
         parsed["prompt"] = original_prompt
