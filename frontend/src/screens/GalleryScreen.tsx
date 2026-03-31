@@ -5,22 +5,28 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GalleryCard } from '../components/GalleryCard';
-import { getEntries, removeEntry } from '../storage/historyDb';
+import { deleteCard, fetchGallery } from '../services/api';
 import { theme } from '../theme';
-import { HistoryEntry } from '../types';
+import { GalleryEntry } from '../types';
 
 const PAGE_SIZE = 20;
 
 export function GalleryScreen() {
   const router = useRouter();
 
-  const [entries, setEntries] = useState<HistoryEntry[]>([]);
+  const [entries, setEntries] = useState<GalleryEntry[]>([]);
+  const [total, setTotal] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [backHovered, setBackHovered] = useState(false);
 
   const loadEntries = useCallback(async () => {
-    const rows = await getEntries(PAGE_SIZE, 0);
-    setEntries(rows);
+    try {
+      const data = await fetchGallery(PAGE_SIZE, 0);
+      setEntries(data.entries);
+      setTotal(data.total);
+    } catch (e) {
+      console.warn('Failed to load gallery:', e);
+    }
   }, []);
 
   useFocusEffect(
@@ -30,12 +36,16 @@ export function GalleryScreen() {
   );
 
   const handleLoadMore = useCallback(async () => {
-    if (entries.length === 0) return;
-    const more = await getEntries(PAGE_SIZE, entries.length);
-    if (more.length > 0) {
-      setEntries((prev) => [...prev, ...more]);
+    if (entries.length === 0 || entries.length >= total) return;
+    try {
+      const data = await fetchGallery(PAGE_SIZE, entries.length);
+      if (data.entries.length > 0) {
+        setEntries((prev) => [...prev, ...data.entries]);
+      }
+    } catch (e) {
+      console.warn('Failed to load more gallery entries:', e);
     }
-  }, [entries.length]);
+  }, [entries.length, total]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -43,25 +53,30 @@ export function GalleryScreen() {
     setRefreshing(false);
   }, [loadEntries]);
 
-  const handleDelete = useCallback((entry: HistoryEntry) => {
+  const handleDelete = useCallback((entry: GalleryEntry) => {
     Alert.alert(
       'Delete generation?',
-      `"${entry.cardMeta?.title ?? 'Untitled'}" will be permanently removed.`,
+      `"${entry.card_meta?.title ?? 'Untitled'}" will be permanently removed from the server.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await removeEntry(entry.id);
-            setEntries((prev) => prev.filter((e) => e.id !== entry.id));
+            try {
+              await deleteCard(entry.id);
+              setEntries((prev) => prev.filter((e) => e.id !== entry.id));
+              setTotal((prev) => prev - 1);
+            } catch (e) {
+              Alert.alert('Error', 'Failed to delete card. Please try again.');
+            }
           },
         },
       ],
     );
   }, []);
 
-  const renderItem = useCallback(({ item }: { item: HistoryEntry }) => (
+  const renderItem = useCallback(({ item }: { item: GalleryEntry }) => (
     <GalleryCard
       entry={item}
       onPress={() => router.push(`/history/${item.id}`)}
@@ -69,7 +84,7 @@ export function GalleryScreen() {
     />
   ), [router, handleDelete]);
 
-  const keyExtractor = useCallback((item: HistoryEntry) => item.id, []);
+  const keyExtractor = useCallback((item: GalleryEntry) => item.id, []);
 
   return (
     <LinearGradient

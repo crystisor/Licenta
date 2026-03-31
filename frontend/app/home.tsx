@@ -8,6 +8,7 @@ export default function HomePage() {
     setPrompt,
     errorMessage,
     handleCast,
+    generationStatus,
     debugEnabled,
     currentTrace,
     recentTraces,
@@ -21,6 +22,7 @@ export default function HomePage() {
     <SummonScreen
       debugPanel={debugPanel}
       errorMessage={errorMessage}
+      generationStatus={generationStatus}
       onCast={handleCast}
       onPromptChange={setPrompt}
       prompt={prompt}

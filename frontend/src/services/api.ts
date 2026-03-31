@@ -1,5 +1,5 @@
 import { extractTraceEventsFromHeader, getDebugTraceHeaderName } from '../debugFlow';
-import { AnimateResponse, AnimateStatusResponse, CardMeta, DebugTraceEvent, GeneratedImage } from '../types';
+import { AnimateResponse, AnimateStatusResponse, CardMeta, DebugTraceEvent, GalleryEntry, GalleryResponse, GeneratedImage } from '../types';
 
 export const EX_IMAGE_ENDPOINT = '/generate/ex-image';
 export const ANIMATE_ENDPOINT = '/generate/animate';
@@ -56,6 +56,52 @@ function toAbsoluteUrl(pathOrUrl: string): string {
   }
 
   return `${getApiBaseUrl()}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
+}
+
+export async function fetchGallery(limit = 20, offset = 0): Promise<{ entries: GalleryEntry[]; total: number }> {
+  const response = await fetch(
+    `${getApiBaseUrl()}/gallery?limit=${limit}&offset=${offset}`,
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch gallery');
+  }
+
+  const data = (await response.json()) as GalleryResponse;
+
+  // Convert relative URLs to absolute
+  const entries = data.entries.map((entry) => ({
+    ...entry,
+    image_url: toAbsoluteUrl(entry.image_url),
+    video_url: entry.video_url ? toAbsoluteUrl(entry.video_url) : null,
+  }));
+
+  return { entries, total: data.total };
+}
+
+export async function fetchCard(cardId: string): Promise<GalleryEntry> {
+  const response = await fetch(`${getApiBaseUrl()}/gallery/${cardId}`);
+
+  if (!response.ok) {
+    throw new Error('Card not found');
+  }
+
+  const entry = (await response.json()) as GalleryEntry;
+  return {
+    ...entry,
+    image_url: toAbsoluteUrl(entry.image_url),
+    video_url: entry.video_url ? toAbsoluteUrl(entry.video_url) : null,
+  };
+}
+
+export async function deleteCard(cardId: string): Promise<void> {
+  const response = await fetch(`${getApiBaseUrl()}/gallery/${cardId}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to delete card');
+  }
 }
 
 export async function generateImage(prompt: string, requestId: string): Promise<GenerateImageResult> {

@@ -1,31 +1,42 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { theme } from '../theme';
-import { HistoryEntry } from '../types';
+import { GalleryEntry } from '../types';
+import { getRarity } from '../utils/rarity';
 
 interface GalleryCardProps {
-  entry: HistoryEntry;
+  entry: GalleryEntry;
   onPress: () => void;
   onLongPress: () => void;
 }
 
 function formatDate(epoch: number): string {
-  const d = new Date(epoch);
+  const d = new Date(epoch * 1000); // backend sends Unix timestamp in seconds
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 export function GalleryCard({ entry, onPress, onLongPress }: GalleryCardProps) {
-  const title = entry.cardMeta?.title ?? 'Untitled';
+  const title = entry.card_meta?.title ?? 'Untitled';
+  const rarityInfo = entry.card_meta?.stats ? getRarity(entry.card_meta.stats) : null;
 
   return (
     <Pressable
       onPress={onPress}
       onLongPress={onLongPress}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+      style={({ pressed }) => [
+        styles.card,
+        rarityInfo && { borderLeftWidth: 3, borderLeftColor: rarityInfo.color },
+        pressed && styles.cardPressed,
+      ]}
     >
       <View style={styles.imageContainer}>
-        <Image source={{ uri: entry.thumbnailUri }} style={styles.image} resizeMode="cover" />
-        {entry.videoUri && (
+        <Image source={{ uri: entry.image_url }} style={styles.image} resizeMode="cover" />
+        {rarityInfo && (
+          <View style={[styles.rarityBadge, { backgroundColor: rarityInfo.color }]}>
+            <Text style={styles.rarityBadgeText}>{rarityInfo.rarity.toUpperCase()}</Text>
+          </View>
+        )}
+        {entry.video_url && (
           <View style={styles.videoBadge}>
             <Text style={styles.videoBadgeText}>VIDEO</Text>
           </View>
@@ -33,8 +44,8 @@ export function GalleryCard({ entry, onPress, onLongPress }: GalleryCardProps) {
       </View>
       <View style={styles.info}>
         <Text style={styles.title} numberOfLines={1}>{title}</Text>
-        <Text style={styles.prompt} numberOfLines={2}>{entry.prompt}</Text>
-        <Text style={styles.date}>{formatDate(entry.createdAt)}</Text>
+        {entry.prompt && <Text style={styles.prompt} numberOfLines={2}>{entry.prompt}</Text>}
+        <Text style={styles.date}>{formatDate(entry.created_at)}</Text>
       </View>
     </Pressable>
   );
@@ -62,6 +73,20 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
+  },
+  rarityBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  rarityBadgeText: {
+    color: '#090B13',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   videoBadge: {
     position: 'absolute',

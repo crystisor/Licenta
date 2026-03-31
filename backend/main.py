@@ -310,6 +310,9 @@ async def _generate_card_meta(image_path: Path, original_prompt: str) -> dict:
             if key not in parsed:
                 raise ValueError(f"Missing key in Ollama response: {key}")
 
+        # Include the original prompt in the metadata
+        parsed["prompt"] = original_prompt
+
         # Cache to sidecar file
         meta_path.write_text(json.dumps(parsed, indent=2))
         print(f"[LORE] Generated card meta for {image_path.name}: {parsed['title']}")
@@ -571,6 +574,126 @@ async def animate_status(job_id: str):
         }
     else:
         return {"status": "error", "detail": job["error"]}
+
+
+# ---------------------------------------------------------------------------
+# Gallery endpoints
+# ---------------------------------------------------------------------------
+class GalleryEntry(BaseModel):
+    id: str
+    image_url: str
+    video_url: str | None = None
+    card_meta: CardMeta | None = None
+    prompt: str | None = None
+    created_at: float
+
+
+class GalleryResponse(BaseModel):
+    entries: list[GalleryEntry]
+    total: int
+
+
+@app.get("/gallery", response_model=GalleryResponse)
+async def get_gallery(limit: int = 20, offset: int = 0):
+    """Return all cards from output/ by scanning .meta.json files."""
+    meta_files = sorted(
+        OUTPUT_DIR.glob("*_00001_.meta.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    total = len(meta_files)
+    page = meta_files[offset : offset + limit]
+
+    entries: list[GalleryEntry] = []
+    for meta_path in page:
+        try:
+            meta = json.loads(meta_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        # Derive batch id and file paths from meta filename
+        # e.g. "b91c20f7_00001_.meta.json" → id="b91c20f7"
+        stem = meta_path.stem.replace(".meta", "")  # "b91c20f7_00001_"
+        batch_id = stem.split("_")[0]
+        image_name = f"{stem}.png"
+        image_path = OUTPUT_DIR / image_name
+
+        if not image_path.exists():
+            continue
+
+        # Check for video
+        video_candidates = list(OUTPUT_DIR.glob(f"{batch_id}_video_*.mp4"))
+        video_url = f"/output/{video_candidates[0].name}" if video_candidates else None
+
+        card_meta = None
+        if all(k in meta for k in ("title", "lore", "stats")):
+            card_meta = CardMeta(
+                title=meta["title"], lore=meta["lore"], stats=meta["stats"]
+            )
+
+        entries.append(
+            GalleryEntry(
+                id=batch_id,
+                image_url=f"/output/{image_name}",
+                video_url=video_url,
+                card_meta=card_meta,
+                prompt=meta.get("prompt"),
+                created_at=meta_path.stat().st_mtime,
+            )
+        )
+
+    return GalleryResponse(entries=entries, total=total)
+
+
+@app.get("/gallery/{card_id}", response_model=GalleryEntry)
+async def get_card(card_id: str):
+    """Return a single card by its batch ID."""
+    meta_files = list(OUTPUT_DIR.glob(f"{card_id}_00001_.meta.json"))
+    if not meta_files:
+        raise HTTPException(status_code=404, detail=f"Card '{card_id}' not found")
+
+    meta_path = meta_files[0]
+    try:
+        meta = json.loads(meta_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        raise HTTPException(status_code=500, detail="Failed to read card metadata")
+
+    stem = meta_path.stem.replace(".meta", "")
+    image_name = f"{stem}.png"
+    image_path = OUTPUT_DIR / image_name
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail="Card image not found")
+
+    video_candidates = list(OUTPUT_DIR.glob(f"{card_id}_video_*.mp4"))
+    video_url = f"/output/{video_candidates[0].name}" if video_candidates else None
+
+    card_meta = None
+    if all(k in meta for k in ("title", "lore", "stats")):
+        card_meta = CardMeta(title=meta["title"], lore=meta["lore"], stats=meta["stats"])
+
+    return GalleryEntry(
+        id=card_id,
+        image_url=f"/output/{image_name}",
+        video_url=video_url,
+        card_meta=card_meta,
+        prompt=meta.get("prompt"),
+        created_at=meta_path.stat().st_mtime,
+    )
+
+
+@app.delete("/gallery/{card_id}")
+async def delete_card(card_id: str):
+    """Delete a card and all its associated files from output/."""
+    deleted = []
+    for pattern in [f"{card_id}_*"]:
+        for f in OUTPUT_DIR.glob(pattern):
+            f.unlink()
+            deleted.append(f.name)
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"No files found for card '{card_id}'")
+
+    return {"deleted": deleted}
 
 
 @app.get("/output/{filename}")

@@ -37,6 +37,20 @@ export interface HistoryEntry {
   createdAt: number;
 }
 
+export interface GalleryEntry {
+  id: string;
+  image_url: string;
+  video_url: string | null;
+  card_meta: CardMeta | null;
+  prompt: string | null;
+  created_at: number;
+}
+
+export interface GalleryResponse {
+  entries: GalleryEntry[];
+  total: number;
+}
+
 export type VideoJobStatus = 'processing' | 'complete' | 'error';
 
 export interface AnimateResponse {

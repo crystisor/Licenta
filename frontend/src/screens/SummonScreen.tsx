@@ -3,12 +3,14 @@ import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput,
 import { useRouter } from 'expo-router';
 
 import { ScreenShell } from '../components/ScreenShell';
+import { GenerationStatus } from '../storage/generationCurrency';
 import { theme } from '../theme';
 import { PROMPT_TEMPLATES, pickRandom } from '../data/promptTemplates';
 
 interface SummonScreenProps {
   prompt: string;
   errorMessage: string | null;
+  generationStatus: GenerationStatus;
   onPromptChange: (nextPrompt: string) => void;
   onCast: () => void;
   debugPanel?: ReactNode;
@@ -17,6 +19,7 @@ interface SummonScreenProps {
 export function SummonScreen({
   prompt,
   errorMessage,
+  generationStatus,
   onPromptChange,
   onCast,
   debugPanel,
@@ -90,13 +93,24 @@ export function SummonScreen({
             </View>
           ) : null}
 
+          <View style={styles.currencyRow}>
+            <Text style={styles.currencyText}>
+              {generationStatus.freeRemaining}/3 free today
+            </Text>
+            {generationStatus.tokens > 0 && (
+              <Text style={styles.currencyTokens}>
+                + {generationStatus.tokens} token{generationStatus.tokens !== 1 ? 's' : ''}
+              </Text>
+            )}
+          </View>
+
           <Pressable
-            disabled={!prompt.trim()}
+            disabled={!prompt.trim() || !generationStatus.canGenerate}
             onPress={onCast}
             style={({ pressed }) => [
               styles.button,
-              !prompt.trim() && styles.buttonDisabled,
-              pressed && prompt.trim() ? styles.buttonPressed : null,
+              (!prompt.trim() || !generationStatus.canGenerate) && styles.buttonDisabled,
+              pressed && prompt.trim() && generationStatus.canGenerate ? styles.buttonPressed : null,
             ]}
           >
             <Text style={styles.buttonText}>Generate image</Text>
@@ -213,6 +227,22 @@ const styles = StyleSheet.create({
     color: theme.colors.danger,
     fontSize: 14,
     lineHeight: 20,
+  },
+  currencyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  currencyText: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  currencyTokens: {
+    color: theme.colors.accent,
+    fontSize: 13,
+    fontWeight: '700',
   },
   button: {
     minHeight: 54,

@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { theme } from '../theme';
 import { CardMeta, GeneratedImage } from '../types';
+import { getRarity, RarityInfo } from '../utils/rarity';
 import { MOTION_SUGGESTIONS } from '../data/promptTemplates';
 
 const FALLBACK_META: CardMeta = {
@@ -170,6 +171,7 @@ export function ResultScreen({
 
   const meta = result.cardMeta ?? FALLBACK_META;
   const statEntries = Object.entries(meta.stats);
+  const rarityInfo: RarityInfo = getRarity(meta.stats);
 
   return (
     <LinearGradient
@@ -192,7 +194,7 @@ export function ResultScreen({
             ]}
           >
             {/* ── Portrait Card ── */}
-            <Animated.View style={[styles.card, { transform: [{ perspective: 1000 }, { rotateY: flipInterpolate }, { scale: scaleAnim }] }]}>
+            <Animated.View style={[styles.card, { borderColor: rarityInfo.color, transform: [{ perspective: 1000 }, { rotateY: flipInterpolate }, { scale: scaleAnim }] }]}>
               {/* Card back — solid surface visible during flips, fades out at the end */}
               <Animated.View style={[styles.cardBack, { opacity: cardBackOpacity }]} pointerEvents="none" />
 
@@ -227,6 +229,9 @@ export function ResultScreen({
                 <View style={styles.bannerWrapper}>
                   <View style={styles.banner}>
                     <Text style={styles.bannerText}>{meta.title}</Text>
+                  </View>
+                  <View style={[styles.rarityBadge, { backgroundColor: rarityInfo.color }]}>
+                    <Text style={styles.rarityBadgeText}>{rarityInfo.rarity.toUpperCase()}</Text>
                   </View>
                 </View>
 
@@ -465,6 +470,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: 1,
+  },
+  rarityBadge: {
+    marginTop: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  rarityBadgeText: {
+    color: '#090B13',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
   },
 
   // ── Description ──
