@@ -1,0 +1,11 @@
+{
+  "title": "Necrothorax, the Purple Mage",
+  "lore": "He weaves shadows and spirits in the graveyard, his purple shroud a cloak of secrets and power. The spectral flames of his staff dance with the whispers of the dead.",
+  "stats": {
+    "Strength": 4,
+    "Magic": 8,
+    "Defense": 5,
+    "Agility": 6
+  },
+  "prompt": "skeleton mage, purple shroud, casting spell, cinematic, graveyard background"
+}

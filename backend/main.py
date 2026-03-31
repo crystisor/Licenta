@@ -365,7 +365,9 @@ def _generate_video_comfy(
     if seed is None:
         seed = random.randint(0, 2**63)
 
-    video_prefix = f"{uuid.uuid4().hex[:8]}_video"
+    # Derive video prefix from the image's batch ID so gallery can find it
+    image_batch_id = image_path.stem.split("_")[0]
+    video_prefix = f"{image_batch_id}_video"
 
     # Submit workflow WITHOUT wait=True — the _watch retry loop in comfy_script
     # hangs indefinitely when SaveVideo output can't be opened as a PIL Image.
