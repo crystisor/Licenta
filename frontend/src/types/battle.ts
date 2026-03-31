@@ -1,9 +1,11 @@
+import { ImageSourcePropType } from 'react-native';
+
 import { Rarity } from '../utils/rarity';
 
 export interface BattleCard {
   id: string;
   title: string;
-  imageUri: string;
+  imageSource: ImageSourcePropType;  // { uri: "..." } or require() asset
   stats: Record<string, number>;
   rarity: Rarity;
   hp: number;

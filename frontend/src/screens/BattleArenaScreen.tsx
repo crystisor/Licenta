@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -247,8 +247,8 @@ export function BattleArenaScreen() {
             {/* Player card */}
             <View style={styles.cardColumn}>
               <View style={[styles.cardFrame, { borderColor: playerRarity.color }]}>
-                {state.playerCard.imageUri ? (
-                  <Image source={{ uri: state.playerCard.imageUri }} style={styles.cardImage} resizeMode="cover" />
+                {state.playerCard.imageSource ? (
+                  <Image source={state.playerCard.imageSource} style={styles.cardImage} resizeMode="cover" />
                 ) : (
                   <View style={styles.cardPlaceholder} />
                 )}
@@ -278,8 +278,8 @@ export function BattleArenaScreen() {
             {/* Opponent card */}
             <View style={styles.cardColumn}>
               <View style={[styles.cardFrame, { borderColor: opponentRarity.color }]}>
-                {state.opponentCard.imageUri ? (
-                  <Image source={{ uri: state.opponentCard.imageUri }} style={styles.cardImage} resizeMode="cover" />
+                {state.opponentCard.imageSource ? (
+                  <Image source={state.opponentCard.imageSource} style={styles.cardImage} resizeMode="cover" />
                 ) : (
                   <View style={styles.cardPlaceholder}>
                     <Text style={styles.placeholderText}>{state.opponentCard.title[0]}</Text>

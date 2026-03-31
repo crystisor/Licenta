@@ -52,6 +52,9 @@ export function BattleSelectScreen() {
 
         {/* Boss preview */}
         <View style={styles.bossPreview}>
+          {boss.imageAsset && (
+            <Image source={boss.imageAsset} style={styles.bossImage} resizeMode="cover" />
+          )}
           <View style={styles.bossPreviewLeft}>
             <Text style={styles.bossPreviewLabel}>OPPONENT</Text>
             <Text style={styles.bossPreviewName}>{boss.name}</Text>
@@ -164,6 +167,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.panelBorder,
     gap: 14,
+    alignItems: 'center',
+  },
+  bossImage: {
+    width: 56,
+    height: 75,
+    borderRadius: 8,
+    backgroundColor: theme.colors.panel,
   },
   bossPreviewLeft: {
     flex: 1,

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -91,9 +91,13 @@ export function BattleHubScreen() {
                 ]}
               >
                 <View style={styles.bossLeft}>
-                  <View style={[styles.bossNumber, isBeaten && styles.bossNumberBeaten]}>
-                    <Text style={styles.bossNumberText}>{isBeaten ? '\u2713' : index + 1}</Text>
-                  </View>
+                  {isUnlocked && item.imageAsset ? (
+                    <Image source={item.imageAsset} style={styles.bossThumb} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.bossNumber, isBeaten && styles.bossNumberBeaten]}>
+                      <Text style={styles.bossNumberText}>{isBeaten ? '\u2713' : index + 1}</Text>
+                    </View>
+                  )}
                 </View>
                 <View style={styles.bossInfo}>
                   <Text style={[styles.bossName, !isUnlocked && styles.textLocked]}>
@@ -218,6 +222,12 @@ const styles = StyleSheet.create({
   },
   bossLeft: {
     justifyContent: 'flex-start',
+  },
+  bossThumb: {
+    width: 48,
+    height: 64,
+    borderRadius: 8,
+    backgroundColor: theme.colors.panel,
   },
   bossNumber: {
     width: 32,

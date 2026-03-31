@@ -17,7 +17,7 @@ export function createBattleCardFromGallery(entry: GalleryEntry): BattleCard | n
   return {
     id: entry.id,
     title: entry.card_meta.title,
-    imageUri: entry.image_url,
+    imageSource: { uri: entry.image_url },
     stats: entry.card_meta.stats,
     rarity,
     hp: BASE_HP,
@@ -30,7 +30,7 @@ export function createBattleCardFromBoss(boss: CampaignBoss): BattleCard {
   return {
     id: boss.id,
     title: boss.name,
-    imageUri: boss.imageAsset,
+    imageSource: boss.imageAsset,
     stats: boss.stats,
     rarity,
     hp: BASE_HP,
