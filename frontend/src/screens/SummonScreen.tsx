@@ -116,15 +116,26 @@ export function SummonScreen({
             <Text style={styles.buttonText}>Generate image</Text>
           </Pressable>
 
-          <Pressable
-            onPress={() => router.push('/gallery')}
-            style={({ pressed }) => [
-              styles.galleryButton,
-              pressed && styles.galleryButtonPressed,
-            ]}
-          >
-            <Text style={styles.galleryButtonText}>Gallery</Text>
-          </Pressable>
+          <View style={styles.navRow}>
+            <Pressable
+              onPress={() => router.push('/gallery')}
+              style={({ pressed }) => [
+                styles.galleryButton,
+                pressed && styles.galleryButtonPressed,
+              ]}
+            >
+              <Text style={styles.galleryButtonText}>Gallery</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push('/battle')}
+              style={({ pressed }) => [
+                styles.battleButton,
+                pressed && styles.battleButtonPressed,
+              ]}
+            >
+              <Text style={styles.battleButtonText}>Battle</Text>
+            </Pressable>
+          </View>
         </View>
         {debugPanel}
       </KeyboardAvoidingView>
@@ -264,7 +275,12 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1.1,
   },
+  navRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   galleryButton: {
+    flex: 1,
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
@@ -279,6 +295,27 @@ const styles = StyleSheet.create({
   },
   galleryButtonText: {
     color: theme.colors.primary,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  battleButton: {
+    flex: 1,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(74, 248, 227, 0.3)',
+    backgroundColor: 'rgba(74, 248, 227, 0.08)',
+  },
+  battleButtonPressed: {
+    transform: [{ scale: 0.98 }],
+    backgroundColor: 'rgba(74, 248, 227, 0.15)',
+  },
+  battleButtonText: {
+    color: theme.colors.accent,
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: 1,

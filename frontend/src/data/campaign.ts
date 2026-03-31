@@ -1,0 +1,106 @@
+import { CampaignBoss } from '../types/battle';
+
+/**
+ * 12 sequential PvE bosses with increasing difficulty.
+ *
+ * Boss images should be pre-generated and placed in frontend/assets/bosses/.
+ * Until then, imageAsset is null and the UI will show a placeholder.
+ */
+export const CAMPAIGN_BOSSES: CampaignBoss[] = [
+  {
+    id: 'boss_01',
+    name: 'Skrix, Tunnel Rat',
+    lore: 'A scrappy rodent warlord who commands the sewers beneath the old keep. His claws are quicker than they look.',
+    stats: { Strength: 4, Magic: 1, Defense: 4, Agility: 5 },
+    imageAsset: null,
+    tokenReward: 1,
+  },
+  {
+    id: 'boss_02',
+    name: 'Hollow Sentinel',
+    lore: 'An animated suit of armor, long abandoned by its wearer. It patrols the ruined gatehouse with tireless purpose.',
+    stats: { Strength: 5, Magic: 1, Defense: 7, Agility: 4 },
+    imageAsset: null,
+    tokenReward: 1,
+  },
+  {
+    id: 'boss_03',
+    name: 'Bramble Witch',
+    lore: 'She weaves thorned hexes from the heart of the dead forest. Her laughter echoes between the blackened trunks.',
+    stats: { Strength: 3, Magic: 7, Defense: 4, Agility: 6 },
+    imageAsset: null,
+    tokenReward: 1,
+  },
+  {
+    id: 'boss_04',
+    name: 'Gorrik the Unbroken',
+    lore: 'An orc gladiator who has never tasted defeat. His iron chains serve as both weapon and armor.',
+    stats: { Strength: 7, Magic: 2, Defense: 6, Agility: 5 },
+    imageAsset: null,
+    tokenReward: 1,
+  },
+  {
+    id: 'boss_05',
+    name: 'Sister Mirael',
+    lore: 'A fallen cleric whose prayers now call forth shadow instead of light. Her hymns corrode steel.',
+    stats: { Strength: 4, Magic: 8, Defense: 5, Agility: 5 },
+    imageAsset: null,
+    tokenReward: 1,
+  },
+  {
+    id: 'boss_06',
+    name: 'Frostfang Alpha',
+    lore: 'The largest dire wolf of the northern wastes. Ice crystallizes in the air with every snarl.',
+    stats: { Strength: 7, Magic: 3, Defense: 6, Agility: 8 },
+    imageAsset: null,
+    tokenReward: 1,
+  },
+  {
+    id: 'boss_07',
+    name: 'Ashcaller Veyhn',
+    lore: 'A pyromancer who burned his own academy to the ground. The fire never left his eyes.',
+    stats: { Strength: 5, Magic: 9, Defense: 5, Agility: 6 },
+    imageAsset: null,
+    tokenReward: 1,
+  },
+  {
+    id: 'boss_08',
+    name: 'Ironhide Golem',
+    lore: 'Forged in the dwarven deeps, this construct obeys its last command: let nothing pass.',
+    stats: { Strength: 8, Magic: 2, Defense: 9, Agility: 3 },
+    imageAsset: null,
+    tokenReward: 2,
+  },
+  {
+    id: 'boss_09',
+    name: 'Pale Duchess',
+    lore: 'An ancient vampire who rules from a throne of petrified roses. Her gaze alone stops hearts.',
+    stats: { Strength: 7, Magic: 8, Defense: 6, Agility: 7 },
+    imageAsset: null,
+    tokenReward: 2,
+  },
+  {
+    id: 'boss_10',
+    name: 'Vorath, the Undying',
+    lore: 'A lich king whose phylactery has never been found. Each defeat only delays his return.',
+    stats: { Strength: 8, Magic: 9, Defense: 7, Agility: 6 },
+    imageAsset: null,
+    tokenReward: 2,
+  },
+  {
+    id: 'boss_11',
+    name: 'Thalrax, Storm Titan',
+    lore: 'Born from a hurricane that refused to die. Lightning arcs between his colossal fists.',
+    stats: { Strength: 9, Magic: 8, Defense: 8, Agility: 7 },
+    imageAsset: null,
+    tokenReward: 2,
+  },
+  {
+    id: 'boss_12',
+    name: 'Azariel, World Ender',
+    lore: 'The final seal is broken. Azariel descends with wings that blot out the sun and a voice that unmakes reality.',
+    stats: { Strength: 9, Magic: 10, Defense: 9, Agility: 8 },
+    imageAsset: null,
+    tokenReward: 3,
+  },
+];
