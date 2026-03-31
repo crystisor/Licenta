@@ -290,11 +290,7 @@ export function ResultScreen({
                   numberOfLines={3}
                   editable={!isAnimating && !videoJobActive}
                 />
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.motionChipRow}
-                >
+                <View style={styles.motionChipRow}>
                   {MOTION_SUGGESTIONS.map((suggestion) => (
                     <Pressable
                       key={suggestion}
@@ -311,7 +307,7 @@ export function ResultScreen({
                       ]}>{suggestion}</Text>
                     </Pressable>
                   ))}
-                </ScrollView>
+                </View>
                 <Pressable
                   onPress={() => onAnimate(motionPrompt)}
                   disabled={isAnimating || videoJobActive || !motionPrompt.trim()}
@@ -633,8 +629,8 @@ const styles = StyleSheet.create({
   },
   motionChipRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
-    paddingRight: 8,
   },
   motionChip: {
     paddingHorizontal: 12,

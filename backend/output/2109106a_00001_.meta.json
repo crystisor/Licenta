@@ -1,0 +1,10 @@
+{
+  "title": "Eldric, the Ironclad",
+  "lore": "He stands as a beacon of valor amidst the ruins, his ironclad form a testament to the fallen. The embers of battle dance around him, a reminder of the war's fury.",
+  "stats": {
+    "Strength": 9,
+    "Magic": 2,
+    "Defense": 8,
+    "Agility": 5
+  }
+}
