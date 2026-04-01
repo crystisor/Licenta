@@ -10,6 +10,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ResizeMode, Video } from 'expo-av';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { theme } from '../theme';
@@ -22,6 +23,7 @@ interface ScreenShellProps {
   footer?: ReactNode;
   contentContainerStyle?: StyleProp<ViewStyle>;
   backgroundImage?: ImageSourcePropType;
+  backgroundVideo?: number | { uri: string };
 }
 
 export function ScreenShell({
@@ -32,29 +34,51 @@ export function ScreenShell({
   footer,
   contentContainerStyle,
   backgroundImage,
+  backgroundVideo,
 }: ScreenShellProps) {
+  const innerContent = (
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+      <ScrollView
+        bounces={false}
+        contentContainerStyle={[styles.scrollContent, contentContainerStyle]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
+        </View>
+        {children}
+        {footer ? <View style={styles.footer}>{footer}</View> : null}
+      </ScrollView>
+    </SafeAreaView>
+  );
+
   const content = (
     <>
       <View pointerEvents="none" style={styles.backgroundGlowOne} />
       <View pointerEvents="none" style={styles.backgroundGlowTwo} />
-      <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-        <ScrollView
-          bounces={false}
-          contentContainerStyle={[styles.scrollContent, contentContainerStyle]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.header}>
-            {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.subtitle}>{subtitle}</Text>
-          </View>
-          {children}
-          {footer ? <View style={styles.footer}>{footer}</View> : null}
-        </ScrollView>
-      </SafeAreaView>
+      {innerContent}
     </>
   );
+
+  if (backgroundVideo) {
+    return (
+      <View style={styles.gradient}>
+        <Video
+          source={backgroundVideo}
+          style={styles.backgroundVideo}
+          resizeMode={ResizeMode.COVER}
+          shouldPlay
+          isLooping
+          isMuted
+          videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' } as any}
+        />
+        {innerContent}
+      </View>
+    );
+  }
 
   if (backgroundImage) {
     return (
@@ -132,6 +156,15 @@ const styles = StyleSheet.create({
   footer: {
     marginTop: 20,
     alignSelf: 'center',
+  },
+  backgroundVideo: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   backgroundGlowOne: {
     position: 'absolute',

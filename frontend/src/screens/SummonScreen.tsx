@@ -45,11 +45,7 @@ export function SummonScreen({
       title="Generate fantasy character cards"
       subtitle="Describe your character — race, class, gear, and lore — and the AI will craft a unique fantasy card illustration for you."
       footer={<Text style={styles.footer}>Powered by Expo on the client and FastAPI on the backend.</Text>}
-      backgroundImage={
-        Platform.OS === 'web'
-          ? require('../../assets/backgrounds/Home screen background desktop_00001_.png')
-          : require('../../assets/backgrounds/Home screen background phone_00001_.png')
-      }
+      backgroundVideo={require('../../assets/backgrounds/Loading screen background.mp4')}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
