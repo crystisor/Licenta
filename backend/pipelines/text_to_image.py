@@ -25,7 +25,7 @@ from backend.utils.model_loader import (
 )
 
 # Pipeline defaults matching the ComfyUI workflow
-DEFAULT_NEGATIVE_PROMPT = "cartoon, deformed"
+DEFAULT_NEGATIVE_PROMPT = "cartoon, deformed, blurry, low quality, bad anatomy, extra limbs, poorly drawn face, cartoon, oversaturated, flat lighting, duplicate body parts, deformed hands, mutated, watermark, text, logo"
 DEFAULT_STEPS = 8
 DEFAULT_CFG = 1.4
 DEFAULT_WIDTH = 1024

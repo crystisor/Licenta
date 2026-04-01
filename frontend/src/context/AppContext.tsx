@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useCallback, useContext, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 
@@ -12,6 +12,7 @@ import {
 } from '../debugFlow';
 import { animateImage, EX_IMAGE_ENDPOINT, generateImage, ImageGenerationError } from '../services/api';
 import { insertEntry, updateVideo } from '../storage/historyDb';
+import { consumeGeneration, GenerationStatus, getGenerationStatus } from '../storage/generationCurrency';
 import { cacheImage, cacheVideo, createThumbnail } from '../storage/mediaCache';
 import { DebugTraceRecord, GeneratedImage } from '../types';
 
@@ -38,6 +39,8 @@ interface AppContextValue {
   debugEnabled: boolean;
   setVideoUrl: (url: string | null) => void | Promise<void>;
   setVideoJobId: (id: string | null) => void;
+  generationStatus: GenerationStatus;
+  refreshGenerationStatus: () => Promise<void>;
   handleCast: () => Promise<void>;
   handleAnimate: (motionPrompt: string) => Promise<void>;
   handleReset: () => void;
@@ -65,6 +68,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [motionPrompt, setMotionPrompt] = useState('');
   const [currentTrace, setCurrentTrace] = useState<DebugTraceRecord | null>(null);
   const [recentTraces, setRecentTraces] = useState<DebugTraceRecord[]>([]);
+  const [generationStatus, setGenerationStatus] = useState<GenerationStatus>({
+    freeRemaining: 3,
+    tokens: 0,
+    canGenerate: true,
+  });
+
+  const refreshGenerationStatus = useCallback(async () => {
+    const status = await getGenerationStatus();
+    setGenerationStatus(status);
+  }, []);
+
+  useEffect(() => {
+    refreshGenerationStatus();
+  }, [refreshGenerationStatus]);
 
   const videoJobActive = videoJobId !== null && videoUrl === null;
 
@@ -122,6 +139,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const handleCast = useCallback(async () => {
     if (!prompt.trim()) return;
 
+    const canSpend = await consumeGeneration();
+    if (!canSpend) {
+      setErrorMessage('No generations remaining. Win battles to earn more tokens!');
+      await refreshGenerationStatus();
+      return;
+    }
+
     const trimmedPrompt = prompt.trim();
     const requestId = createRequestId();
 
@@ -167,6 +191,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       setResult(nextImage);
+      await refreshGenerationStatus();
       router.replace('/display');
     } catch (error) {
       if (error instanceof ImageGenerationError) {
@@ -182,7 +207,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setErrorMessage(message);
       router.replace('/home');
     }
-  }, [mergeTraceEvents, prompt, recordTraceEvent, router, startTrace]);
+  }, [mergeTraceEvents, prompt, recordTraceEvent, refreshGenerationStatus, router, startTrace]);
 
   const handleAnimate = useCallback(async (mp: string) => {
     if (!result || !mp.trim()) return;
@@ -230,6 +255,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         videoJobId,
         videoJobActive,
         motionPrompt,
+        generationStatus,
+        refreshGenerationStatus,
         setVideoUrl,
         setVideoJobId,
         currentTrace,

@@ -2,24 +2,28 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { getEntry } from '../storage/historyDb';
+import { fetchCard } from '../services/api';
 import { ResultScreen } from './ResultScreen';
 import { theme } from '../theme';
-import { GeneratedImage, HistoryEntry } from '../types';
+import { GalleryEntry, GeneratedImage } from '../types';
 
 export function HistoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
-  const [entry, setEntry] = useState<HistoryEntry | null>(null);
+  const [entry, setEntry] = useState<GalleryEntry | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!id) return;
-    getEntry(id).then((row) => {
-      setEntry(row);
-      setLoading(false);
-    });
+    fetchCard(id)
+      .then((card) => {
+        setEntry(card);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+      });
   }, [id]);
 
   const handleBack = useCallback(() => {
@@ -42,10 +46,10 @@ export function HistoryDetailScreen() {
   }
 
   const result: GeneratedImage = {
-    prompt: entry.prompt,
-    imageUrl: entry.imageUri,
+    prompt: entry.prompt ?? '',
+    imageUrl: entry.image_url,
     requestId: entry.id,
-    cardMeta: entry.cardMeta,
+    cardMeta: entry.card_meta,
   };
 
   return (
@@ -53,7 +57,7 @@ export function HistoryDetailScreen() {
       result={result}
       onReset={handleBack}
       onAnimate={handleAnimateNoop}
-      videoUrl={entry.videoUri}
+      videoUrl={entry.video_url}
       fromHistory
     />
   );

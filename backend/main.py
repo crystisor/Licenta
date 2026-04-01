@@ -107,6 +107,7 @@ class CardMeta(BaseModel):
     title: str
     lore: str
     stats: dict[str, int]
+    creativity: int = 5
 
 
 class ImageResponse(BaseModel):
@@ -196,7 +197,7 @@ OLLAMA_URL = "http://localhost:11434/api/chat"
 OLLAMA_MODEL = "qwen2.5vl:7b"
 
 CARD_META_SYSTEM_PROMPT = """You are a fantasy lore writer for a collectible card game.
-Analyze the provided character image and return a JSON object with three fields.
+Analyze the provided character image and the user's original prompt, then return a JSON object.
 
 ## Output Format (strict JSON, no markdown)
 {
@@ -207,7 +208,8 @@ Analyze the provided character image and return a JSON object with three fields.
     "Magic": <1-10>,
     "Defense": <1-10>,
     "Agility": <1-10>
-  }
+  },
+  "creativity": <1-10>
 }
 
 ## Rules for "title"
@@ -228,25 +230,37 @@ Analyze the provided character image and return a JSON object with three fields.
 - Base the stats on what you see: heavy armor = high Defense, staff/runes = high Magic, etc.
 - Not every character is strong in everything — create contrast
 
+## Rules for "creativity"
+- Rate how creative, original, and imaginative the user's prompt is on a scale of 1 to 10
+- 1-3: Generic or cliché concepts (e.g. "a knight", "a wizard with a staff")
+- 4-6: Decent concept with some unique elements (e.g. "an elven necromancer in a frozen swamp")
+- 7-8: Highly original concept with vivid details (e.g. "a blind oracle whose tears turn to gemstones, sitting in a cathedral made of whale bones")
+- 9-10: Exceptionally imaginative and unprecedented (e.g. "a sentient aurora borealis that has taken humanoid form, wearing armor woven from gravitational waves")
+- Judge the PROMPT, not the image — reward unusual combinations, specific details, and imaginative worldbuilding
+
 ## Examples
 
 Input: An image of a dark elf in leather armor with twin daggers, crouching in a moonlit forest.
+Prompt: "a dark elf assassin in a moonlit forest"
 Output:
 {
   "title": "Syvra, Fang of the Eclipse",
   "lore": "She moves between the silver birches like a rumor, her twin blades drinking moonlight. The forest remembers every throat they have opened.",
-  "stats": {"Strength": 5, "Magic": 3, "Defense": 4, "Agility": 9}
+  "stats": {"Strength": 5, "Magic": 3, "Defense": 4, "Agility": 9},
+  "creativity": 3
 }
 
 Input: An image of a hulking orc shaman surrounded by glowing green spirits, holding a gnarled staff.
+Prompt: "an orc shaman who channels ancestor spirits through emerald flame, scarred from a ritual that bound his soul to theirs"
 Output:
 {
   "title": "Grul'thar, the Spiritbound",
   "lore": "The ancestors speak through him in tongues of emerald flame. Each spirit he summons carries the weight of a century's rage, and he bears them all without flinching.",
-  "stats": {"Strength": 7, "Magic": 9, "Defense": 6, "Agility": 3}
+  "stats": {"Strength": 7, "Magic": 9, "Defense": 6, "Agility": 3},
+  "creativity": 7
 }
 
-The user's original prompt is provided for context, but focus on what you SEE in the image."""
+The user's original prompt is provided for context. Base stats on what you SEE in the image, but base creativity on the PROMPT text."""
 
 
 def _fallback_meta(original_prompt: str) -> dict:
@@ -263,6 +277,7 @@ def _fallback_meta(original_prompt: str) -> dict:
             "Defense": 5,
             "Agility": 5,
         },
+        "creativity": 5,
     }
 
 
@@ -309,6 +324,14 @@ async def _generate_card_meta(image_path: Path, original_prompt: str) -> dict:
         for key in ("title", "lore", "stats"):
             if key not in parsed:
                 raise ValueError(f"Missing key in Ollama response: {key}")
+
+        # Ensure creativity score exists and is clamped to 1-10
+        creativity = parsed.get("creativity")
+        if not isinstance(creativity, (int, float)) or not (1 <= creativity <= 10):
+            parsed["creativity"] = 5
+
+        # Include the original prompt in the metadata
+        parsed["prompt"] = original_prompt
 
         # Cache to sidecar file
         meta_path.write_text(json.dumps(parsed, indent=2))
@@ -362,7 +385,9 @@ def _generate_video_comfy(
     if seed is None:
         seed = random.randint(0, 2**63)
 
-    video_prefix = f"{uuid.uuid4().hex[:8]}_video"
+    # Derive video prefix from the image's batch ID so gallery can find it
+    image_batch_id = image_path.stem.split("_")[0]
+    video_prefix = f"{image_batch_id}_video"
 
     # Submit workflow WITHOUT wait=True — the _watch retry loop in comfy_script
     # hangs indefinitely when SaveVideo output can't be opened as a PIL Image.
@@ -571,6 +596,126 @@ async def animate_status(job_id: str):
         }
     else:
         return {"status": "error", "detail": job["error"]}
+
+
+# ---------------------------------------------------------------------------
+# Gallery endpoints
+# ---------------------------------------------------------------------------
+class GalleryEntry(BaseModel):
+    id: str
+    image_url: str
+    video_url: str | None = None
+    card_meta: CardMeta | None = None
+    prompt: str | None = None
+    created_at: float
+
+
+class GalleryResponse(BaseModel):
+    entries: list[GalleryEntry]
+    total: int
+
+
+@app.get("/gallery", response_model=GalleryResponse)
+async def get_gallery(limit: int = 20, offset: int = 0):
+    """Return all cards from output/ by scanning .meta.json files."""
+    meta_files = sorted(
+        OUTPUT_DIR.glob("*_00001_.meta.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    total = len(meta_files)
+    page = meta_files[offset : offset + limit]
+
+    entries: list[GalleryEntry] = []
+    for meta_path in page:
+        try:
+            meta = json.loads(meta_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+
+        # Derive batch id and file paths from meta filename
+        # e.g. "b91c20f7_00001_.meta.json" → id="b91c20f7"
+        stem = meta_path.stem.replace(".meta", "")  # "b91c20f7_00001_"
+        batch_id = stem.split("_")[0]
+        image_name = f"{stem}.png"
+        image_path = OUTPUT_DIR / image_name
+
+        if not image_path.exists():
+            continue
+
+        # Check for video
+        video_candidates = list(OUTPUT_DIR.glob(f"{batch_id}_video_*.mp4"))
+        video_url = f"/output/{video_candidates[0].name}" if video_candidates else None
+
+        card_meta = None
+        if all(k in meta for k in ("title", "lore", "stats")):
+            card_meta = CardMeta(
+                title=meta["title"], lore=meta["lore"], stats=meta["stats"]
+            )
+
+        entries.append(
+            GalleryEntry(
+                id=batch_id,
+                image_url=f"/output/{image_name}",
+                video_url=video_url,
+                card_meta=card_meta,
+                prompt=meta.get("prompt"),
+                created_at=meta_path.stat().st_mtime,
+            )
+        )
+
+    return GalleryResponse(entries=entries, total=total)
+
+
+@app.get("/gallery/{card_id}", response_model=GalleryEntry)
+async def get_card(card_id: str):
+    """Return a single card by its batch ID."""
+    meta_files = list(OUTPUT_DIR.glob(f"{card_id}_00001_.meta.json"))
+    if not meta_files:
+        raise HTTPException(status_code=404, detail=f"Card '{card_id}' not found")
+
+    meta_path = meta_files[0]
+    try:
+        meta = json.loads(meta_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        raise HTTPException(status_code=500, detail="Failed to read card metadata")
+
+    stem = meta_path.stem.replace(".meta", "")
+    image_name = f"{stem}.png"
+    image_path = OUTPUT_DIR / image_name
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail="Card image not found")
+
+    video_candidates = list(OUTPUT_DIR.glob(f"{card_id}_video_*.mp4"))
+    video_url = f"/output/{video_candidates[0].name}" if video_candidates else None
+
+    card_meta = None
+    if all(k in meta for k in ("title", "lore", "stats")):
+        card_meta = CardMeta(title=meta["title"], lore=meta["lore"], stats=meta["stats"])
+
+    return GalleryEntry(
+        id=card_id,
+        image_url=f"/output/{image_name}",
+        video_url=video_url,
+        card_meta=card_meta,
+        prompt=meta.get("prompt"),
+        created_at=meta_path.stat().st_mtime,
+    )
+
+
+@app.delete("/gallery/{card_id}")
+async def delete_card(card_id: str):
+    """Delete a card and all its associated files from output/."""
+    deleted = []
+    for pattern in [f"{card_id}_*"]:
+        for f in OUTPUT_DIR.glob(pattern):
+            f.unlink()
+            deleted.append(f.name)
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"No files found for card '{card_id}'")
+
+    return {"deleted": deleted}
 
 
 @app.get("/output/{filename}")

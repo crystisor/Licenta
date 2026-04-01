@@ -14,6 +14,12 @@ export const theme = {
     track: '#22283D',
     card: '#12182A',
     overlay: 'rgba(5, 7, 14, 0.72)',
+
+    rarityCommon: '#9CA3AF',
+    rarityUncommon: '#22D3EE',
+    rarityRare: '#3B82F6',
+    rarityEpic: '#A855F7',
+    rarityLegendary: '#FFD700',
   },
   radius: {
     lg: 24,

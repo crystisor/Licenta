@@ -3,12 +3,14 @@ import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput,
 import { useRouter } from 'expo-router';
 
 import { ScreenShell } from '../components/ScreenShell';
+import { GenerationStatus } from '../storage/generationCurrency';
 import { theme } from '../theme';
 import { PROMPT_TEMPLATES, pickRandom } from '../data/promptTemplates';
 
 interface SummonScreenProps {
   prompt: string;
   errorMessage: string | null;
+  generationStatus: GenerationStatus;
   onPromptChange: (nextPrompt: string) => void;
   onCast: () => void;
   debugPanel?: ReactNode;
@@ -17,6 +19,7 @@ interface SummonScreenProps {
 export function SummonScreen({
   prompt,
   errorMessage,
+  generationStatus,
   onPromptChange,
   onCast,
   debugPanel,
@@ -42,6 +45,7 @@ export function SummonScreen({
       title="Generate fantasy character cards"
       subtitle="Describe your character — race, class, gear, and lore — and the AI will craft a unique fantasy card illustration for you."
       footer={<Text style={styles.footer}>Powered by Expo on the client and FastAPI on the backend.</Text>}
+      backgroundVideo={require('../../assets/backgrounds/Loading screen background.mp4')}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -90,27 +94,49 @@ export function SummonScreen({
             </View>
           ) : null}
 
+          <View style={styles.currencyRow}>
+            <Text style={styles.currencyText}>
+              {generationStatus.freeRemaining}/3 free today
+            </Text>
+            {generationStatus.tokens > 0 && (
+              <Text style={styles.currencyTokens}>
+                + {generationStatus.tokens} token{generationStatus.tokens !== 1 ? 's' : ''}
+              </Text>
+            )}
+          </View>
+
           <Pressable
-            disabled={!prompt.trim()}
+            disabled={!prompt.trim() || !generationStatus.canGenerate}
             onPress={onCast}
             style={({ pressed }) => [
               styles.button,
-              !prompt.trim() && styles.buttonDisabled,
-              pressed && prompt.trim() ? styles.buttonPressed : null,
+              (!prompt.trim() || !generationStatus.canGenerate) && styles.buttonDisabled,
+              pressed && prompt.trim() && generationStatus.canGenerate ? styles.buttonPressed : null,
             ]}
           >
             <Text style={styles.buttonText}>Generate image</Text>
           </Pressable>
 
-          <Pressable
-            onPress={() => router.push('/gallery')}
-            style={({ pressed }) => [
-              styles.galleryButton,
-              pressed && styles.galleryButtonPressed,
-            ]}
-          >
-            <Text style={styles.galleryButtonText}>Gallery</Text>
-          </Pressable>
+          <View style={styles.navRow}>
+            <Pressable
+              onPress={() => router.push('/gallery')}
+              style={({ pressed }) => [
+                styles.galleryButton,
+                pressed && styles.galleryButtonPressed,
+              ]}
+            >
+              <Text style={styles.galleryButtonText}>Gallery</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => router.push('/battle')}
+              style={({ pressed }) => [
+                styles.battleButton,
+                pressed && styles.battleButtonPressed,
+              ]}
+            >
+              <Text style={styles.battleButtonText}>Battle</Text>
+            </Pressable>
+          </View>
         </View>
         {debugPanel}
       </KeyboardAvoidingView>
@@ -214,6 +240,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  currencyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  currencyText: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  currencyTokens: {
+    color: theme.colors.accent,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   button: {
     minHeight: 54,
     alignItems: 'center',
@@ -234,7 +276,12 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1.1,
   },
+  navRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   galleryButton: {
+    flex: 1,
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
@@ -249,6 +296,27 @@ const styles = StyleSheet.create({
   },
   galleryButtonText: {
     color: theme.colors.primary,
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  battleButton: {
+    flex: 1,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(74, 248, 227, 0.3)',
+    backgroundColor: 'rgba(74, 248, 227, 0.08)',
+  },
+  battleButtonPressed: {
+    transform: [{ scale: 0.98 }],
+    backgroundColor: 'rgba(74, 248, 227, 0.15)',
+  },
+  battleButtonText: {
+    color: theme.colors.accent,
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: 1,

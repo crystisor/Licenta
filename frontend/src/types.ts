@@ -2,6 +2,7 @@ export interface CardMeta {
   title: string;
   lore: string;
   stats: Record<string, number>;
+  creativity?: number;  // 1-10, prompt originality score from LLM
 }
 
 export interface GeneratedImage {
@@ -35,6 +36,20 @@ export interface HistoryEntry {
   videoUri: string | null;
   motionPrompt: string | null;
   createdAt: number;
+}
+
+export interface GalleryEntry {
+  id: string;
+  image_url: string;
+  video_url: string | null;
+  card_meta: CardMeta | null;
+  prompt: string | null;
+  created_at: number;
+}
+
+export interface GalleryResponse {
+  entries: GalleryEntry[];
+  total: number;
 }
 
 export type VideoJobStatus = 'processing' | 'complete' | 'error';
