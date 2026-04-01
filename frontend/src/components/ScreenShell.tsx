@@ -1,5 +1,7 @@
 import { ReactNode } from 'react';
 import {
+  ImageBackground,
+  ImageSourcePropType,
   ScrollView,
   StyleProp,
   StyleSheet,
@@ -19,6 +21,7 @@ interface ScreenShellProps {
   children: ReactNode;
   footer?: ReactNode;
   contentContainerStyle?: StyleProp<ViewStyle>;
+  backgroundImage?: ImageSourcePropType;
 }
 
 export function ScreenShell({
@@ -28,12 +31,10 @@ export function ScreenShell({
   children,
   footer,
   contentContainerStyle,
+  backgroundImage,
 }: ScreenShellProps) {
-  return (
-    <LinearGradient
-      colors={[theme.colors.backgroundTop, theme.colors.backgroundBottom]}
-      style={styles.gradient}
-    >
+  const content = (
+    <>
       <View pointerEvents="none" style={styles.backgroundGlowOne} />
       <View pointerEvents="none" style={styles.backgroundGlowTwo} />
       <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
@@ -52,6 +53,33 @@ export function ScreenShell({
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </ScrollView>
       </SafeAreaView>
+    </>
+  );
+
+  if (backgroundImage) {
+    return (
+      <ImageBackground
+        source={backgroundImage}
+        style={styles.gradient}
+        resizeMode="cover"
+        imageStyle={{ width: '100%', height: '100%' }}
+      >
+        <LinearGradient
+          colors={['rgba(9,11,19,0.55)', 'rgba(21,27,47,0.8)']}
+          style={styles.gradient}
+        >
+          {content}
+        </LinearGradient>
+      </ImageBackground>
+    );
+  }
+
+  return (
+    <LinearGradient
+      colors={[theme.colors.backgroundTop, theme.colors.backgroundBottom]}
+      style={styles.gradient}
+    >
+      {content}
     </LinearGradient>
   );
 }
