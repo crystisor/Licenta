@@ -36,6 +36,13 @@ export function BattleSelectScreen() {
 
   const bossRarity = getRarity(boss.stats);
   const bossStatTotal = Object.values(boss.stats).reduce((s, v) => s + v, 0);
+  const selectedCard = cards.find((c) => c.id === selectedId);
+  const selectedRarity = selectedCard
+    ? getRarity(selectedCard.card_meta!.stats, selectedCard.card_meta!.creativity)
+    : null;
+  const selectedStatTotal = selectedCard
+    ? Object.values(selectedCard.card_meta!.stats).reduce((s, v) => s + v, 0)
+    : 0;
 
   return (
     <LinearGradient
@@ -50,28 +57,62 @@ export function BattleSelectScreen() {
           <Text style={styles.headerTitle}>Choose Your Card</Text>
         </View>
 
-        {/* Boss preview */}
-        <View style={styles.bossPreview}>
-          {boss.imageAsset && (
-            <Image source={boss.imageAsset} style={styles.bossImage} resizeMode="cover" />
-          )}
-          <View style={styles.bossPreviewLeft}>
-            <Text style={styles.bossPreviewLabel}>OPPONENT</Text>
-            <Text style={styles.bossPreviewName}>{boss.name}</Text>
-            <View style={[styles.rarityTag, { backgroundColor: bossRarity.color }]}>
-              <Text style={styles.rarityTagText}>{bossRarity.rarity} ({bossStatTotal})</Text>
+        {/* Matchup preview row */}
+        <View style={styles.matchupRow}>
+          {/* Boss (left) */}
+          <View style={styles.matchupCard}>
+            <View style={styles.cardSide}>
+              {boss.imageAsset && (
+                <Image source={boss.imageAsset} style={styles.previewImage} resizeMode="cover" />
+              )}
+              <View style={styles.sideStats}>
+                {Object.entries(boss.stats).map(([key, val]) => (
+                  <View key={key} style={styles.statRow}>
+                    <Text style={styles.statKey}>{key.slice(0, 3)}</Text>
+                    <Text style={styles.statVal}>{String(val)}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+            <View style={styles.cardInfo}>
+              <Text style={styles.cardLabel}>OPPONENT</Text>
+              <Text style={styles.cardName} numberOfLines={1}>{boss.name}</Text>
+              <View style={[styles.rarityTag, { backgroundColor: bossRarity.color }]}>
+                <Text style={styles.rarityTagText}>{bossRarity.rarity} ({bossStatTotal})</Text>
+              </View>
             </View>
           </View>
-          <View style={styles.bossStats}>
-            {Object.entries(boss.stats).map(([key, val]) => (
-              <View key={key} style={styles.statRow}>
-                <Text style={styles.statKey}>{key.slice(0, 3)}</Text>
-                <View style={styles.statBar}>
-                  <View style={[styles.statFill, { width: `${(val as number) * 10}%` }]} />
+
+          <Text style={styles.vsText}>VS</Text>
+
+          {/* Player card (right) */}
+          <View style={styles.matchupCard}>
+            {selectedCard ? (
+              <>
+                <View style={styles.cardSide}>
+                  <Image source={{ uri: selectedCard.image_url }} style={styles.previewImage} resizeMode="cover" />
+                  <View style={styles.sideStats}>
+                    {Object.entries(selectedCard.card_meta!.stats).map(([key, val]) => (
+                      <View key={key} style={styles.statRow}>
+                        <Text style={styles.statKey}>{key.slice(0, 3)}</Text>
+                        <Text style={styles.statVal}>{String(val)}</Text>
+                      </View>
+                    ))}
+                  </View>
                 </View>
-                <Text style={styles.statVal}>{String(val)}</Text>
+                <View style={styles.cardInfo}>
+                  <Text style={styles.cardLabel}>YOUR CARD</Text>
+                  <Text style={styles.cardName} numberOfLines={1}>{selectedCard.card_meta!.title}</Text>
+                  <View style={[styles.rarityTag, { backgroundColor: selectedRarity!.color }]}>
+                    <Text style={styles.rarityTagText}>{selectedRarity!.rarity} ({selectedStatTotal})</Text>
+                  </View>
+                </View>
+              </>
+            ) : (
+              <View style={styles.emptySlot}>
+                <Text style={styles.emptySlotText}>Select a card below</Text>
               </View>
-            ))}
+            )}
           </View>
         </View>
 
@@ -157,29 +198,41 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginRight: 56,
   },
-  bossPreview: {
+  matchupRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     marginHorizontal: 16,
     marginBottom: 12,
-    padding: 14,
+    gap: 8,
+  },
+  matchupCard: {
+    flex: 1,
+    padding: 10,
     backgroundColor: theme.colors.card,
     borderRadius: theme.radius.md,
     borderWidth: 1,
     borderColor: theme.colors.panelBorder,
-    gap: 14,
-    alignItems: 'center',
+    gap: 8,
   },
-  bossImage: {
-    width: 56,
-    height: 75,
+  cardSide: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  previewImage: {
+    width: 50,
+    height: 67,
     borderRadius: 8,
     backgroundColor: theme.colors.panel,
   },
-  bossPreviewLeft: {
-    flex: 1,
-    gap: 4,
+  sideStats: {
+    gap: 2,
+    justifyContent: 'center',
   },
-  bossPreviewLabel: {
+  cardInfo: {
+    gap: 3,
+  },
+  cardLabel: {
     color: theme.colors.textMuted,
     fontSize: 9,
     fontWeight: '700',
@@ -187,10 +240,16 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     opacity: 0.6,
   },
-  bossPreviewName: {
+  cardName: {
     color: theme.colors.text,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
+  },
+  vsText: {
+    color: theme.colors.textMuted,
+    fontSize: 14,
+    fontWeight: '800',
+    opacity: 0.5,
   },
   rarityTag: {
     alignSelf: 'flex-start',
@@ -203,14 +262,20 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '800',
   },
-  bossStats: {
-    gap: 4,
+  emptySlot: {
+    alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 24,
+  },
+  emptySlotText: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    opacity: 0.6,
   },
   statRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   statKey: {
     color: theme.colors.textMuted,
@@ -219,23 +284,11 @@ const styles = StyleSheet.create({
     width: 24,
     textTransform: 'uppercase',
   },
-  statBar: {
-    width: 60,
-    height: 4,
-    backgroundColor: theme.colors.track,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  statFill: {
-    height: '100%',
-    backgroundColor: theme.colors.primary,
-    borderRadius: 2,
-  },
   statVal: {
     color: theme.colors.text,
-    fontSize: 10,
+    fontSize: 14,
     fontWeight: '700',
-    width: 16,
+    width: 18,
     textAlign: 'right',
   },
   empty: {

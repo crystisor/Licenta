@@ -26,6 +26,7 @@ async function load(): Promise<CurrencyData> {
   if (data.date !== todayString()) {
     data.date = todayString();
     data.freeRemaining = FREE_DAILY_LIMIT;
+    await save(data);
   }
 
   return data;
