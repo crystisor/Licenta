@@ -44,7 +44,7 @@ export function SummonScreen({
       eyebrow="AI Cards"
       title="Generate fantasy character cards"
       subtitle="Describe your character — race, class, gear, and lore — and the AI will craft a unique fantasy card illustration for you."
-      footer={<Text style={styles.footer}>Powered by Expo on the client and FastAPI on the backend.</Text>}
+      subtitleStyle={{ color: theme.colors.text }}
       backgroundVideo={require('../../assets/backgrounds/Loading screen background.mp4')}
     >
       <KeyboardAvoidingView
@@ -321,10 +321,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1,
     textTransform: 'uppercase',
-  },
-  footer: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    textAlign: 'center',
   },
 });

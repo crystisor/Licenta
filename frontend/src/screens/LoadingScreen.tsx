@@ -1,12 +1,11 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { AnimatedOrb, AnimatedProgressBar, AnimatedSteps } from '../components/LoadingAnimations';
 import { ScreenShell } from '../components/ScreenShell';
 import { theme } from '../theme';
 
 interface LoadingScreenProps {
-  prompt: string;
   debugPanel?: ReactNode;
 }
 
@@ -17,7 +16,7 @@ const STEPS = [
   "Writing the character's lore",
 ];
 
-export function LoadingScreen({ prompt, debugPanel }: LoadingScreenProps) {
+export function LoadingScreen({ debugPanel }: LoadingScreenProps) {
   const [progress, setProgress] = useState(10);
 
   useEffect(() => {
@@ -42,9 +41,10 @@ export function LoadingScreen({ prompt, debugPanel }: LoadingScreenProps) {
     <ScreenShell
       eyebrow="Ritual in progress"
       title="Rendering your image"
-      subtitle="The backend text-to-image pipeline is processing your prompt now."
+      subtitle=""
       contentContainerStyle={styles.content}
-      footer={<Text style={styles.footer}>Prompt: {prompt.trim() || 'Untitled image'}</Text>}
+      backgroundImage={require('../../assets/bosses/Cleric.png')}
+      backgroundOverlay={['rgba(9,11,19,0)', 'rgba(21,27,47,0)']}
     >
       <View style={styles.center}>
         <AnimatedOrb glyph="AL" />
@@ -79,10 +79,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.panelBorder,
     backgroundColor: theme.colors.panel,
-  },
-  footer: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    textAlign: 'center',
   },
 });
