@@ -6,6 +6,7 @@ import {
   StyleProp,
   StyleSheet,
   Text,
+  TextStyle,
   View,
   ViewStyle,
 } from 'react-native';
@@ -24,6 +25,8 @@ interface ScreenShellProps {
   contentContainerStyle?: StyleProp<ViewStyle>;
   backgroundImage?: ImageSourcePropType;
   backgroundVideo?: number | { uri: string };
+  backgroundOverlay?: [string, string];
+  subtitleStyle?: StyleProp<TextStyle>;
 }
 
 export function ScreenShell({
@@ -35,6 +38,8 @@ export function ScreenShell({
   contentContainerStyle,
   backgroundImage,
   backgroundVideo,
+  backgroundOverlay,
+  subtitleStyle,
 }: ScreenShellProps) {
   const innerContent = (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
@@ -47,7 +52,7 @@ export function ScreenShell({
         <View style={styles.header}>
           {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
+          <Text style={[styles.subtitle, subtitleStyle]}>{subtitle}</Text>
         </View>
         {children}
         {footer ? <View style={styles.footer}>{footer}</View> : null}
@@ -89,7 +94,7 @@ export function ScreenShell({
         imageStyle={{ width: '100%', height: '100%' }}
       >
         <LinearGradient
-          colors={['rgba(9,11,19,0.55)', 'rgba(21,27,47,0.8)']}
+          colors={backgroundOverlay ?? ['rgba(9,11,19,0.55)', 'rgba(21,27,47,0.8)']}
           style={styles.gradient}
         >
           {content}
