@@ -1,0 +1,12 @@
+{
+  "title": "Gorgon, the Forest Tyrant",
+  "lore": "Gorgon, the Forest Tyrant, roars through the misty glades, his glowing eyes piercing the darkness. The ancient trees bow to his presence, and bioluminescent plants glow under his watchful gaze.",
+  "stats": {
+    "Strength": 10,
+    "Magic": 2,
+    "Defense": 8,
+    "Agility": 5
+  },
+  "creativity": 9,
+  "prompt": "Mythical beast standing in an ancient forest clearing, massive hybrid creature with horns, fangs, and glowing eyes, intricate fur and scale textures, muscular body, mist curling around its form, broken stone ruins nearby, bioluminescent plants, cinematic composition, dramatic lighting, cool green and blue tones, high resolution, ultra detailed texture, sharp focus, powerful stance, low angle shot, mystical atmosphere, realistic style, bad hands, bad eyes"
+}
