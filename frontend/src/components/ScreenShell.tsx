@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   title: {
-    color: theme.colors.text,
+    color: theme.colors.primary,
     fontSize: 34,
     lineHeight: 40,
     fontWeight: '800',

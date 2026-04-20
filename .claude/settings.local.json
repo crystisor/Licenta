@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"console.log\\(require\\('react-native-screens/package.json'\\).version\\)\")"
+    ]
+  }
+}
