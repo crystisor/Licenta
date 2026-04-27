@@ -1,0 +1,12 @@
+{
+  "title": "Rattus, the Urban Scavenger",
+  "lore": "Rattus navigates the shadows of the city, scavenging for scraps and secrets. His keen senses and nimble paws make him a master of the alleyways.",
+  "stats": {
+    "Strength": 4,
+    "Magic": 2,
+    "Defense": 5,
+    "Agility": 8
+  },
+  "creativity": 5,
+  "prompt": "rat"
+}
