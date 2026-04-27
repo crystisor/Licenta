@@ -1,12 +1,14 @@
 import { useCallback, useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { GalleryCard } from '../components/GalleryCard';
+import { SparkAmbient } from '../components/spark/SparkAmbient';
+import { SparkBackButton } from '../components/spark/SparkBackButton';
+import { SparkGalleryCard } from '../components/spark/SparkGalleryCard';
 import { deleteCard, fetchGallery } from '../services/api';
-import { theme } from '../theme';
+import { sparkTheme } from '../theme';
 import { GalleryEntry } from '../types';
 
 const PAGE_SIZE = 20;
@@ -17,7 +19,6 @@ export function GalleryScreen() {
   const [entries, setEntries] = useState<GalleryEntry[]>([]);
   const [total, setTotal] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [backHovered, setBackHovered] = useState(false);
 
   const loadEntries = useCallback(async () => {
     try {
@@ -77,7 +78,7 @@ export function GalleryScreen() {
   }, []);
 
   const renderItem = useCallback(({ item }: { item: GalleryEntry }) => (
-    <GalleryCard
+    <SparkGalleryCard
       entry={item}
       onPress={() => router.push(`/history/${item.id}`)}
       onLongPress={() => handleDelete(item)}
@@ -87,25 +88,24 @@ export function GalleryScreen() {
   const keyExtractor = useCallback((item: GalleryEntry) => item.id, []);
 
   return (
-    <LinearGradient
-      colors={[theme.colors.backgroundTop, theme.colors.backgroundBottom]}
-      style={styles.gradient}
-    >
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={[sparkTheme.colors.bgGradientTop, sparkTheme.colors.bgGradientBottom]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+      />
+      <SparkAmbient />
+
       <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
         <View style={styles.header}>
-          <Pressable
-            onPress={() => router.back()}
-            onHoverIn={() => setBackHovered(true)}
-            onHoverOut={() => setBackHovered(false)}
-            style={({ pressed }) => [
-              styles.backButton,
-              backHovered && styles.backButtonHovered,
-              pressed && styles.backButtonPressed,
-            ]}
-          >
-            <Text style={styles.backText}>Back</Text>
-          </Pressable>
-          <Text style={styles.title}>Gallery</Text>
+          <SparkBackButton onPress={() => router.back()} />
+          <View style={styles.titleBlock}>
+            <Text style={styles.eyebrow}>COLLECTION</Text>
+            <Text style={styles.title}>Gallery</Text>
+          </View>
+          <View style={styles.headerSpacer} />
         </View>
 
         {entries.length === 0 ? (
@@ -130,13 +130,14 @@ export function GalleryScreen() {
           />
         )}
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  gradient: {
+  root: {
     flex: 1,
+    backgroundColor: sparkTheme.colors.bg,
   },
   safeArea: {
     flex: 1,
@@ -144,62 +145,53 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 16,
+    paddingHorizontal: sparkTheme.spacing[5],
+    paddingTop: sparkTheme.spacing[5],
+    paddingBottom: sparkTheme.spacing[6],
+    gap: sparkTheme.spacing[5],
   },
-  backButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(184, 160, 255, 0.25)',
-    backgroundColor: 'rgba(184, 160, 255, 0.08)',
+  titleBlock: {
+    flex: 1,
+    alignItems: 'center',
+    gap: sparkTheme.spacing[1],
   },
-  backButtonHovered: {
-    backgroundColor: 'rgba(184, 160, 255, 0.18)',
-    borderColor: theme.colors.primaryStrong,
+  headerSpacer: {
+    width: 88,
   },
-  backButtonPressed: {
-    transform: [{ scale: 0.96 }],
-    backgroundColor: 'rgba(184, 160, 255, 0.25)',
-  },
-  backText: {
-    color: theme.colors.primary,
-    fontSize: 15,
+  eyebrow: {
+    color: sparkTheme.colors.brand,
+    fontSize: sparkTheme.type.micro.fontSize,
+    lineHeight: sparkTheme.type.micro.lineHeight,
     fontWeight: '700',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
   },
   title: {
-    flex: 1,
-    color: theme.colors.text,
-    fontSize: 22,
+    color: sparkTheme.colors.textPrimary,
+    fontSize: 28,
+    lineHeight: 32,
     fontWeight: '800',
-    letterSpacing: 1,
-    textAlign: 'center',
-    marginRight: 56,
   },
   list: {
-    paddingHorizontal: 10,
-    paddingBottom: 32,
+    paddingHorizontal: sparkTheme.spacing[4],
+    paddingBottom: sparkTheme.spacing[8],
   },
   empty: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
-    gap: 12,
+    paddingHorizontal: sparkTheme.spacing[8],
+    gap: sparkTheme.spacing[4],
   },
   emptyTitle: {
-    color: theme.colors.textMuted,
-    fontSize: 18,
+    color: sparkTheme.colors.textSecondary,
+    fontSize: sparkTheme.type.h3.fontSize,
     fontWeight: '700',
   },
   emptySubtitle: {
-    color: theme.colors.textMuted,
-    fontSize: 14,
+    color: sparkTheme.colors.textMuted,
+    fontSize: sparkTheme.type.small.fontSize,
+    lineHeight: sparkTheme.type.small.lineHeight,
     textAlign: 'center',
-    lineHeight: 20,
-    opacity: 0.6,
   },
 });
