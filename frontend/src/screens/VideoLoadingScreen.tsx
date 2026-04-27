@@ -1,19 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedOrb, AnimatedProgressBar, AnimatedSteps } from '../components/LoadingAnimations';
-import { ScreenShell } from '../components/ScreenShell';
+import {
+  SparkLoadingOrb,
+  SparkLoadingProgressBar,
+  SparkLoadingSteps,
+} from '../components/spark/SparkLoadingAnimations';
+import { SparkAmbient } from '../components/spark/SparkAmbient';
 import { useAppContext } from '../context/AppContext';
 import { getAnimateStatus } from '../services/api';
-import { theme } from '../theme';
+import { sparkTheme } from '../theme';
+import { useSparkPress } from '../components/spark/sparkPress';
+import Animated from 'react-native-reanimated';
 
 const STEPS = [
-  'Preparing the ritual circle...',
-  'Channeling the image...',
-  'Weaving motion into frames...',
-  'Rendering the final vision...',
-  'Sealing the summoning...',
+  'Encoding the start image',
+  'Loading high-noise UNet + LoRA',
+  'Loading low-noise UNet + LoRA',
+  'Sampling 81 frames @ 640²',
+  'Encoding video to mp4',
 ];
 
 function getActiveStep(progress: number): number {
@@ -24,7 +32,7 @@ function getActiveStep(progress: number): number {
   return 0;
 }
 
-const POLL_INTERVAL = 5_000; // reduced from 10s to 5s for more responsive updates
+const POLL_INTERVAL = 5_000;
 
 export function VideoLoadingScreen() {
   const router = useRouter();
@@ -33,7 +41,6 @@ export function VideoLoadingScreen() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  // Poll for job status
   useEffect(() => {
     if (!videoJobId) return;
 
@@ -42,7 +49,6 @@ export function VideoLoadingScreen() {
     const poll = async () => {
       try {
         const status = await getAnimateStatus(videoJobId);
-
         if (cancelled) return;
 
         if (status.status === 'processing') {
@@ -59,7 +65,7 @@ export function VideoLoadingScreen() {
         }
       } catch {
         if (cancelled) return;
-        setError('Connection lost \u2014 video generation may have failed.');
+        setError('Connection lost — video generation may have failed.');
         return;
       }
     };
@@ -75,99 +81,219 @@ export function VideoLoadingScreen() {
 
   const activeStep = useMemo(() => getActiveStep(progress), [progress]);
 
+  // Error state
   if (error) {
     return (
-      <ScreenShell
-        eyebrow="Generation failed"
-        title="Something went wrong"
-        subtitle={error}
-        contentContainerStyle={styles.content}
-      >
-        <View style={styles.center}>
-          <Pressable
-            onPress={() => router.replace('/display')}
-            style={({ pressed }) => [
-              styles.retryButton,
-              pressed && styles.retryButtonPressed,
-            ]}
-          >
-            <Text style={styles.retryButtonText}>Back to card</Text>
-          </Pressable>
-        </View>
-      </ScreenShell>
+      <View style={styles.root}>
+        <StatusBar barStyle="light-content" />
+        <LinearGradient
+          colors={[sparkTheme.colors.bgGradientTop, sparkTheme.colors.bgGradientBottom]}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+        />
+        <SparkAmbient />
+
+        <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
+          <View style={styles.center}>
+            <View style={styles.errorPill}>
+              <Text style={styles.errorPillText}>GENERATION FAILED</Text>
+            </View>
+            <Text style={styles.title}>Something went wrong</Text>
+            <Text style={styles.errorMessage}>{error}</Text>
+            <RetryButton onPress={() => router.replace('/display')} />
+          </View>
+        </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <ScreenShell
-      eyebrow="Animation in progress"
-      title="Rendering your video"
-      subtitle="The backend image-to-video pipeline is animating your character now."
-      contentContainerStyle={styles.content}
-      backgroundVideo={require('../../assets/backgrounds/Loading screen background.mp4')}
-      footer={
-        <Text style={styles.footer}>
-          Motion: {motionPrompt.trim() || 'No motion prompt'}
-        </Text>
-      }
-    >
-      <View style={styles.center}>
-        <AnimatedOrb glyph="I2V" />
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={[sparkTheme.colors.bgGradientTop, sparkTheme.colors.bgGradientBottom]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+      />
+      <SparkAmbient />
 
-        <View style={styles.progressCard}>
-          <AnimatedProgressBar progress={progress} />
-          <AnimatedSteps steps={STEPS} activeStep={activeStep} />
+      <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
+        <View style={styles.center}>
+          <View style={styles.headerBlock}>
+            <View style={styles.eyebrowPill}>
+              <Text style={styles.eyebrowText}>WAN 2.2 I2V PIPELINE</Text>
+            </View>
+            <Text style={styles.title}>Rendering your video</Text>
+            <Text style={styles.subtitle}>
+              Dual-pass denoising with high/low-noise 14B FP8 models and LightX2V 4-step LoRAs at 81 frames, 640×640.
+            </Text>
+          </View>
+
+          <SparkLoadingOrb glyph="I2V" />
+
+          <View style={styles.panel}>
+            <SparkLoadingProgressBar progress={progress} />
+            <View style={styles.divider} />
+            <SparkLoadingSteps steps={STEPS} activeStep={activeStep} />
+          </View>
+
+          <View style={styles.motionRow}>
+            <Text style={styles.motionLabel}>MOTION</Text>
+            <Text style={styles.motionText} numberOfLines={2}>
+              {motionPrompt.trim() || 'No motion prompt'}
+            </Text>
+          </View>
         </View>
-      </View>
-    </ScreenShell>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+function RetryButton({ onPress }: { onPress: () => void }) {
+  const { animatedStyle, onPressIn, onPressOut } = useSparkPress(0.96);
+  return (
+    <Animated.View style={animatedStyle}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={({ pressed }) => [
+          styles.retryButton,
+          pressed && { backgroundColor: sparkTheme.colors.brandHover },
+        ]}
+      >
+        <Text style={styles.retryButtonText}>Back to Card</Text>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    justifyContent: 'center',
+  root: {
+    flex: 1,
+    backgroundColor: sparkTheme.colors.bg,
+  },
+  safe: {
+    flex: 1,
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 28,
-    paddingVertical: 16,
+    paddingHorizontal: sparkTheme.spacing[5],
+    paddingVertical: sparkTheme.spacing[6],
+    gap: sparkTheme.spacing[7],
   },
-  progressCard: {
-    width: '100%',
-    maxWidth: 620,
-    padding: 22,
-    gap: 16,
-    borderRadius: theme.radius.lg,
+  headerBlock: {
+    alignItems: 'center',
+    gap: sparkTheme.spacing[3],
+    maxWidth: 580,
+  },
+  eyebrowPill: {
+    paddingHorizontal: sparkTheme.spacing[4],
+    paddingVertical: sparkTheme.spacing[2],
+    borderRadius: sparkTheme.radius.pill,
+    backgroundColor: sparkTheme.colors.brandSoft,
     borderWidth: 1,
-    borderColor: theme.colors.panelBorder,
-    backgroundColor: theme.colors.panel,
+    borderColor: sparkTheme.colors.brandBorder,
   },
-  footer: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
+  eyebrowText: {
+    color: sparkTheme.colors.brand,
+    fontSize: sparkTheme.type.micro.fontSize,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
+  title: {
+    color: sparkTheme.colors.textPrimary,
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '800',
     textAlign: 'center',
   },
+  subtitle: {
+    color: sparkTheme.colors.textMuted,
+    fontSize: sparkTheme.type.small.fontSize,
+    lineHeight: sparkTheme.type.small.lineHeight,
+    textAlign: 'center',
+  },
+  panel: {
+    width: '100%',
+    maxWidth: 580,
+    padding: sparkTheme.spacing[7],
+    gap: sparkTheme.spacing[5],
+    borderRadius: sparkTheme.radius.lg,
+    borderWidth: 1,
+    borderColor: sparkTheme.colors.border,
+    backgroundColor: sparkTheme.colors.bgElevated,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: sparkTheme.colors.border,
+    marginVertical: sparkTheme.spacing[1],
+  },
+  motionRow: {
+    width: '100%',
+    maxWidth: 580,
+    paddingHorizontal: sparkTheme.spacing[5],
+    paddingVertical: sparkTheme.spacing[4],
+    borderRadius: sparkTheme.radius.md,
+    borderWidth: 1,
+    borderColor: sparkTheme.colors.border,
+    backgroundColor: sparkTheme.colors.bg,
+    gap: sparkTheme.spacing[1],
+  },
+  motionLabel: {
+    color: sparkTheme.colors.brand,
+    fontSize: sparkTheme.type.micro.fontSize,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+  },
+  motionText: {
+    color: sparkTheme.colors.textSecondary,
+    fontSize: sparkTheme.type.small.fontSize,
+    lineHeight: sparkTheme.type.small.lineHeight,
+    fontStyle: 'italic',
+  },
+
+  // Error state
+  errorPill: {
+    paddingHorizontal: sparkTheme.spacing[4],
+    paddingVertical: sparkTheme.spacing[2],
+    borderRadius: sparkTheme.radius.pill,
+    backgroundColor: sparkTheme.colors.brandSoft,
+    borderWidth: 1,
+    borderColor: sparkTheme.colors.brand,
+  },
+  errorPillText: {
+    color: sparkTheme.colors.brand,
+    fontSize: sparkTheme.type.micro.fontSize,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
+  errorMessage: {
+    color: sparkTheme.colors.textMuted,
+    fontSize: sparkTheme.type.body.fontSize,
+    lineHeight: sparkTheme.type.body.lineHeight,
+    textAlign: 'center',
+    maxWidth: 480,
+  },
   retryButton: {
-    minHeight: 54,
-    paddingHorizontal: 32,
+    minHeight: 52,
+    paddingHorizontal: sparkTheme.spacing[8],
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(184, 160, 255, 0.35)',
-    backgroundColor: 'rgba(184, 160, 255, 0.12)',
-  },
-  retryButtonPressed: {
-    transform: [{ scale: 0.98 }],
-    backgroundColor: 'rgba(184, 160, 255, 0.2)',
+    borderRadius: sparkTheme.radius.md,
+    backgroundColor: sparkTheme.colors.brand,
+    ...sparkTheme.shadow.brand,
   },
   retryButtonText: {
-    color: theme.colors.text,
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    color: sparkTheme.colors.textPrimary,
+    fontSize: sparkTheme.type.body.fontSize,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });
