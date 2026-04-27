@@ -1,18 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
-import {
-  AccessibilityInfo,
-  Animated,
-  Easing,
-  Image,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { AccessibilityInfo, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import Animated, {
+  Easing,
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { sparkTheme } from '../../theme';
 import { fetchGallery } from '../../services/api';
@@ -31,24 +28,18 @@ function pickRandomN<T>(arr: T[], n: number): T[] {
   return copy.slice(0, n);
 }
 
-const CARD_WIDTH = 160;
-const CARD_HEIGHT = 220;
-const CARD_GAP = sparkTheme.spacing[4];
-const SCROLL_PX_PER_SEC = 60;
-const RESUME_DELAY_MS = 3000;
+const CARD_WIDTH = 200;
+const CARD_HEIGHT = 260;
+const CARD_GAP = sparkTheme.spacing[5]; // 16
+const SCROLL_PX_PER_SEC = 50;
+const FADE_WIDTH = 80;
 
 export function SparkRecentCarousel() {
   const router = useRouter();
   const [entries, setEntries] = useState<GalleryEntry[]>([]);
   const [reduceMotion, setReduceMotion] = useState(false);
 
-  const scrollRef = useRef<ScrollView | null>(null);
-  const offsetRef = useRef(0);
-  const animRef = useRef<Animated.CompositeAnimation | null>(null);
-  const listenerIdRef = useRef<string | null>(null);
-  const resumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const draggingRef = useRef(false);
-  const animValue = useRef(new Animated.Value(0)).current;
+  const tx = useSharedValue(0);
 
   useEffect(() => {
     let mounted = true;
@@ -71,83 +62,28 @@ export function SparkRecentCarousel() {
     };
   }, []);
 
-  const stopAuto = () => {
-    if (animRef.current) {
-      animRef.current.stop();
-      animRef.current = null;
-    }
-    if (listenerIdRef.current !== null) {
-      animValue.removeListener(listenerIdRef.current);
-      listenerIdRef.current = null;
-    }
-  };
-
-  const startAuto = () => {
-    stopAuto();
-    if (reduceMotion || entries.length === 0 || draggingRef.current) return;
-
-    const cycleWidth = entries.length * (CARD_WIDTH + CARD_GAP);
-    if (cycleWidth <= 0) return;
-
-    const startFrom = offsetRef.current % cycleWidth;
-    const target = startFrom + cycleWidth;
-    const duration = (cycleWidth / SCROLL_PX_PER_SEC) * 1000;
-
-    animValue.setValue(startFrom);
-    listenerIdRef.current = animValue.addListener(({ value }) => {
-      const x = value % cycleWidth;
-      offsetRef.current = x;
-      scrollRef.current?.scrollTo({ x, animated: false });
-    });
-
-    const anim = Animated.timing(animValue, {
-      toValue: target,
-      duration,
-      easing: Easing.linear,
-      useNativeDriver: false,
-    });
-
-    animRef.current = anim;
-    anim.start(({ finished }) => {
-      if (listenerIdRef.current !== null) {
-        animValue.removeListener(listenerIdRef.current);
-        listenerIdRef.current = null;
-      }
-      if (finished && !draggingRef.current && !reduceMotion) {
-        offsetRef.current = 0;
-        startAuto();
-      }
-    });
-  };
+  // Width of one full cycle (the un-doubled list).
+  const cycleWidth = entries.length * (CARD_WIDTH + CARD_GAP);
 
   useEffect(() => {
-    startAuto();
+    cancelAnimation(tx);
+    tx.value = 0;
+    if (reduceMotion || entries.length === 0) return;
+
+    const duration = (cycleWidth / SCROLL_PX_PER_SEC) * 1000;
+    tx.value = withRepeat(
+      withTiming(-cycleWidth, { duration, easing: Easing.linear }),
+      -1,
+      false,
+    );
     return () => {
-      stopAuto();
-      if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
+      cancelAnimation(tx);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries.length, reduceMotion]);
+  }, [tx, cycleWidth, reduceMotion, entries.length]);
 
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (draggingRef.current) {
-      offsetRef.current = e.nativeEvent.contentOffset.x;
-    }
-  };
-
-  const handleDragStart = () => {
-    draggingRef.current = true;
-    stopAuto();
-    if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
-  };
-
-  const handleDragEnd = () => {
-    draggingRef.current = false;
-    if (resumeTimerRef.current) clearTimeout(resumeTimerRef.current);
-    resumeTimerRef.current = setTimeout(() => {
-      if (!draggingRef.current) startAuto();
-    }, RESUME_DELAY_MS);
-  };
+  const trackStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: tx.value }],
+  }));
 
   if (entries.length === 0) return null;
 
@@ -155,31 +91,42 @@ export function SparkRecentCarousel() {
 
   return (
     <View style={styles.section}>
-      <View style={styles.header}>
-        <Text style={styles.heading}>Recent Generations</Text>
-        <Pressable onPress={() => router.push('/gallery')} hitSlop={8}>
-          <Text style={styles.viewAll}>View full gallery →</Text>
-        </Pressable>
-      </View>
+      <View style={styles.panel}>
+        <View style={styles.header}>
+          <Text style={styles.heading}>Recent Generations</Text>
+          <Pressable onPress={() => router.push('/gallery')} hitSlop={8}>
+            <Text style={styles.viewAll}>View full gallery →</Text>
+          </Pressable>
+        </View>
 
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        onScroll={handleScroll}
-        onScrollBeginDrag={handleDragStart}
-        onScrollEndDrag={handleDragEnd}
-        scrollEventThrottle={16}
-      >
-        {doubled.map((entry, idx) => (
-          <CarouselCard
-            key={`${entry.id}-${idx}`}
-            entry={entry}
-            onPress={() => router.push(`/history/${entry.id}`)}
+        <View style={styles.viewport}>
+          <Animated.View style={[styles.track, trackStyle]}>
+            {doubled.map((entry, idx) => (
+              <CarouselCard
+                key={`${entry.id}-${idx}`}
+                entry={entry}
+                onPress={() => router.push(`/history/${entry.id}`)}
+              />
+            ))}
+          </Animated.View>
+
+          {/* Edge fade masks */}
+          <LinearGradient
+            colors={[sparkTheme.colors.bgElevated, 'rgba(9,10,10,0.7)', 'rgba(0,0,0,0)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            pointerEvents="none"
+            style={styles.fadeLeft}
           />
-        ))}
-      </ScrollView>
+          <LinearGradient
+            colors={['rgba(0,0,0,0)', 'rgba(9,10,10,0.7)', sparkTheme.colors.bgElevated]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            pointerEvents="none"
+            style={styles.fadeRight}
+          />
+        </View>
+      </View>
     </View>
   );
 }
@@ -189,8 +136,11 @@ function CarouselCard({ entry, onPress }: { entry: GalleryEntry; onPress: () => 
     <Pressable onPress={onPress} style={styles.card}>
       <Image source={{ uri: entry.image_url }} style={styles.thumb} resizeMode="cover" />
       <View style={styles.cardBody}>
+        <Text numberOfLines={1} style={styles.cardTitle}>
+          {entry.card_meta?.title ?? 'Generated card'}
+        </Text>
         <Text numberOfLines={2} style={styles.cardPrompt}>
-          {entry.prompt ?? entry.card_meta?.title ?? 'Generated card'}
+          {entry.prompt ?? '—'}
         </Text>
       </View>
     </Pressable>
@@ -199,18 +149,25 @@ function CarouselCard({ entry, onPress }: { entry: GalleryEntry; onPress: () => 
 
 const styles = StyleSheet.create({
   section: {
+    paddingHorizontal: sparkTheme.spacing[5],
     paddingVertical: sparkTheme.spacing[7],
     width: '100%',
+    maxWidth: 1200,
+    alignSelf: 'center',
+  },
+  panel: {
+    borderRadius: sparkTheme.radius.lg,
+    borderWidth: 1,
+    borderColor: sparkTheme.colors.border,
+    backgroundColor: sparkTheme.colors.bgElevated,
+    padding: sparkTheme.spacing[6],
+    gap: sparkTheme.spacing[5],
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: sparkTheme.spacing[5],
-    marginBottom: sparkTheme.spacing[5],
-    maxWidth: 1200,
-    alignSelf: 'center',
-    width: '100%',
   },
   heading: {
     color: sparkTheme.colors.textPrimary,
@@ -223,31 +180,62 @@ const styles = StyleSheet.create({
     fontSize: sparkTheme.type.small.fontSize,
     fontWeight: '600',
   },
-  scrollContent: {
-    paddingHorizontal: sparkTheme.spacing[5],
+  viewport: {
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: sparkTheme.radius.md,
+  },
+  track: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: CARD_GAP,
+    paddingVertical: sparkTheme.spacing[3],
   },
   card: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
     borderRadius: sparkTheme.radius.md,
-    backgroundColor: sparkTheme.colors.bgElevated,
+    backgroundColor: sparkTheme.colors.bg,
     borderWidth: 1,
     borderColor: sparkTheme.colors.border,
     overflow: 'hidden',
   },
   thumb: {
     width: '100%',
-    height: 140,
+    height: 170,
     backgroundColor: sparkTheme.colors.bg,
   },
   cardBody: {
-    padding: sparkTheme.spacing[4],
+    paddingHorizontal: sparkTheme.spacing[4],
+    paddingVertical: sparkTheme.spacing[3],
     flex: 1,
+    gap: sparkTheme.spacing[1],
+  },
+  cardTitle: {
+    color: sparkTheme.colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   cardPrompt: {
-    color: sparkTheme.colors.textSecondary,
+    color: sparkTheme.colors.textMuted,
     fontSize: sparkTheme.type.micro.fontSize,
     lineHeight: sparkTheme.type.micro.lineHeight,
+  },
+  fadeLeft: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: FADE_WIDTH,
+    zIndex: 10,
+  },
+  fadeRight: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: FADE_WIDTH,
+    zIndex: 10,
   },
 });

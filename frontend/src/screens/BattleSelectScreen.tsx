@@ -61,7 +61,12 @@ export function BattleSelectScreen() {
 
       <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
         <View style={styles.headerRow}>
-          <SparkBackButton onPress={() => router.back()} />
+          <SparkBackButton
+            onPress={() => {
+              if (router.canGoBack()) router.back();
+              else router.replace('/battle');
+            }}
+          />
           <View style={styles.titleBlock}>
             <Text style={styles.eyebrow}>{mode === 'quick' ? 'QUICK BATTLE' : 'CAMPAIGN'}</Text>
             <Text style={styles.title}>Choose Your Card</Text>
