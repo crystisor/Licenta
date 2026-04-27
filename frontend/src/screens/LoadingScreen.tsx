@@ -1,9 +1,15 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StatusBar, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedOrb, AnimatedProgressBar, AnimatedSteps } from '../components/LoadingAnimations';
-import { ScreenShell } from '../components/ScreenShell';
-import { theme } from '../theme';
+import {
+  SparkLoadingOrb,
+  SparkLoadingProgressBar,
+  SparkLoadingSteps,
+} from '../components/spark/SparkLoadingAnimations';
+import { SparkAmbient } from '../components/spark/SparkAmbient';
+import { sparkTheme } from '../theme';
 
 interface LoadingScreenProps {
   debugPanel?: ReactNode;
@@ -26,7 +32,6 @@ export function LoadingScreen({ debugPanel }: LoadingScreenProps) {
         return current + 6;
       });
     }, 340);
-
     return () => clearInterval(timer);
   }, []);
 
@@ -38,46 +43,105 @@ export function LoadingScreen({ debugPanel }: LoadingScreenProps) {
   }, [progress]);
 
   return (
-    <ScreenShell
-      eyebrow="Ritual in progress"
-      title="Rendering your image"
-      subtitle=""
-      contentContainerStyle={styles.content}
-      backgroundImage={require('../../assets/bosses/Cleric.png')}
-      backgroundOverlay={['rgba(9,11,19,0)', 'rgba(21,27,47,0)']}
-    >
-      <View style={styles.center}>
-        <AnimatedOrb glyph="AL" />
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={[sparkTheme.colors.bgGradientTop, sparkTheme.colors.bgGradientBottom]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+      />
+      <SparkAmbient />
 
-        <View style={styles.progressCard}>
-          <AnimatedProgressBar progress={progress} />
-          <AnimatedSteps steps={STEPS} activeStep={activeStep} />
+      <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
+        <View style={styles.center}>
+          <View style={styles.headerBlock}>
+            <View style={styles.eyebrowPill}>
+              <Text style={styles.eyebrowText}>SDXL PIPELINE</Text>
+            </View>
+            <Text style={styles.title}>Rendering your image</Text>
+            <Text style={styles.subtitle}>
+              Juggernaut XL is sampling 35 steps with DPM++ 2M SDE Karras at 832×1216.
+            </Text>
+          </View>
+
+          <SparkLoadingOrb glyph="AL" />
+
+          <View style={styles.panel}>
+            <SparkLoadingProgressBar progress={progress} />
+            <View style={styles.divider} />
+            <SparkLoadingSteps steps={STEPS} activeStep={activeStep} />
+          </View>
+
+          {debugPanel}
         </View>
-        {debugPanel}
-      </View>
-    </ScreenShell>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    justifyContent: 'center',
+  root: {
+    flex: 1,
+    backgroundColor: sparkTheme.colors.bg,
+  },
+  safe: {
+    flex: 1,
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 28,
-    paddingVertical: 16,
+    paddingHorizontal: sparkTheme.spacing[5],
+    paddingVertical: sparkTheme.spacing[6],
+    gap: sparkTheme.spacing[7],
   },
-  progressCard: {
-    width: '100%',
-    maxWidth: 620,
-    padding: 22,
-    gap: 16,
-    borderRadius: theme.radius.lg,
+  headerBlock: {
+    alignItems: 'center',
+    gap: sparkTheme.spacing[3],
+    maxWidth: 560,
+  },
+  eyebrowPill: {
+    paddingHorizontal: sparkTheme.spacing[4],
+    paddingVertical: sparkTheme.spacing[2],
+    borderRadius: sparkTheme.radius.pill,
+    backgroundColor: sparkTheme.colors.brandSoft,
     borderWidth: 1,
-    borderColor: theme.colors.panelBorder,
-    backgroundColor: theme.colors.panel,
+    borderColor: sparkTheme.colors.brandBorder,
+  },
+  eyebrowText: {
+    color: sparkTheme.colors.brand,
+    fontSize: sparkTheme.type.micro.fontSize,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
+  title: {
+    color: sparkTheme.colors.textPrimary,
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  subtitle: {
+    color: sparkTheme.colors.textMuted,
+    fontSize: sparkTheme.type.small.fontSize,
+    lineHeight: sparkTheme.type.small.lineHeight,
+    textAlign: 'center',
+  },
+  panel: {
+    width: '100%',
+    maxWidth: 560,
+    padding: sparkTheme.spacing[7],
+    gap: sparkTheme.spacing[5],
+    borderRadius: sparkTheme.radius.lg,
+    borderWidth: 1,
+    borderColor: sparkTheme.colors.border,
+    backgroundColor: sparkTheme.colors.bgElevated,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: sparkTheme.colors.border,
+    marginVertical: sparkTheme.spacing[1],
   },
 });
