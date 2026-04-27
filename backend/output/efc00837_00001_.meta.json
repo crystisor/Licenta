@@ -1,0 +1,12 @@
+{
+  "title": "Bella, the Smiling Guardian",
+  "lore": "Her wagging tail and bright eyes speak of loyalty and joy, a beacon of hope in the darkest of nights.",
+  "stats": {
+    "Strength": 2,
+    "Magic": 1,
+    "Defense": 3,
+    "Agility": 4
+  },
+  "creativity": 2,
+  "prompt": "dog"
+}

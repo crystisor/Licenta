@@ -1,0 +1,12 @@
+{
+  "title": "Aurelian, the Radiant Guardian",
+  "lore": "A celestial knight, Aurelian descends from the heavens, his golden armor glowing with divine light. His wings spread wide, he holds a luminous sword, ready to defend the heavens against darkness.",
+  "stats": {
+    "Strength": 8,
+    "Magic": 7,
+    "Defense": 9,
+    "Agility": 6
+  },
+  "creativity": 9,
+  "prompt": "Celestial knight descending from the heavens, radiant armor glowing with divine light, angelic wings spread wide, ornate golden plate with engraved runes, halo of light above head, holding a luminous sword, floating in a sky filled with clouds and sun rays, particles of light drifting, cinematic composition, soft radiant lighting, warm gold and white tones, high resolution, ultra detailed texture, sharp focus, heroic expression, epic atmosphere, low angle shot, realistic style, bad hands, bad eyes"
+}

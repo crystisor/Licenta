@@ -1,14 +1,18 @@
 import { useCallback, useState } from 'react';
-import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, Pressable, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated from 'react-native-reanimated';
 
 import { CAMPAIGN_BOSSES } from '../data/campaign';
 import { getCampaignProgress } from '../storage/campaignProgress';
 import { CampaignProgress } from '../types/battle';
 import { getRarity } from '../utils/rarity';
-import { theme } from '../theme';
+import { sparkTheme } from '../theme';
+import { SparkAmbient } from '../components/spark/SparkAmbient';
+import { SparkBackButton } from '../components/spark/SparkBackButton';
+import { useSparkLift, useSparkPress } from '../components/spark/sparkPress';
 
 export function BattleHubScreen() {
   const router = useRouter();
@@ -31,7 +35,6 @@ export function BattleHubScreen() {
   };
 
   const handleQuickBattle = () => {
-    // Pick a random unlocked boss
     const maxIndex = progress.completedAt
       ? CAMPAIGN_BOSSES.length - 1
       : Math.max(0, progress.currentBoss);
@@ -43,30 +46,45 @@ export function BattleHubScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={[theme.colors.backgroundTop, theme.colors.backgroundBottom]}
-      style={styles.gradient}
-    >
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={[sparkTheme.colors.bgGradientTop, sparkTheme.colors.bgGradientBottom]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+      />
+      <SparkAmbient />
+
       <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backText}>Back</Text>
-          </Pressable>
-          <Text style={styles.headerTitle}>Battle</Text>
+        <View style={styles.headerRow}>
+          <SparkBackButton onPress={() => router.back()} />
+          <View style={styles.titleBlock}>
+            <Text style={styles.eyebrow}>ARENA</Text>
+            <Text style={styles.title}>Battle</Text>
+          </View>
+          <View style={styles.headerSpacer} />
         </View>
 
         {progress.completedAt && (
           <View style={styles.completedBanner}>
-            <Text style={styles.completedText}>Campaign Complete!</Text>
+            <Text style={styles.completedText}>★ Campaign Complete ★</Text>
+            <Text style={styles.completedSubtext}>
+              All twelve adversaries have fallen. Quick Battle unlocked across the full roster.
+            </Text>
           </View>
         )}
 
-        <Pressable onPress={handleQuickBattle} style={styles.quickBattleButton}>
-          <Text style={styles.quickBattleText}>Quick Battle</Text>
-          <Text style={styles.quickBattleSubtext}>Random opponent — 1 token reward</Text>
-        </Pressable>
+        <QuickBattleButton onPress={handleQuickBattle} />
 
-        <Text style={styles.sectionTitle}>Campaign</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionEyebrow}>CAMPAIGN</Text>
+          <Text style={styles.sectionMeta}>
+            {progress.completedAt
+              ? `${CAMPAIGN_BOSSES.length}/${CAMPAIGN_BOSSES.length}`
+              : `${progress.currentBoss}/${CAMPAIGN_BOSSES.length}`}
+          </Text>
+        </View>
 
         <FlatList
           data={CAMPAIGN_BOSSES}
@@ -81,210 +99,382 @@ export function BattleHubScreen() {
             const statTotal = Object.values(item.stats).reduce((s, v) => s + v, 0);
 
             return (
-              <Pressable
+              <BossCard
                 onPress={() => handleBossPress(index)}
                 disabled={!isUnlocked}
-                style={[
-                  styles.bossCard,
-                  isCurrent && { borderColor: theme.colors.accent },
-                  !isUnlocked && styles.bossLocked,
-                ]}
-              >
-                <View style={styles.bossLeft}>
-                  {isUnlocked && item.imageAsset ? (
-                    <Image source={item.imageAsset} style={styles.bossThumb} resizeMode="cover" />
-                  ) : (
-                    <View style={[styles.bossNumber, isBeaten && styles.bossNumberBeaten]}>
-                      <Text style={styles.bossNumberText}>{isBeaten ? '\u2713' : index + 1}</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.bossInfo}>
-                  <Text style={[styles.bossName, !isUnlocked && styles.textLocked]}>
-                    {isUnlocked ? item.name : '???'}
-                  </Text>
-                  {isUnlocked && (
-                    <>
-                      <Text style={styles.bossLore} numberOfLines={2}>{item.lore}</Text>
-                      <View style={styles.bossTagRow}>
-                        <View style={[styles.rarityTag, { backgroundColor: rarityInfo.color }]}>
-                          <Text style={styles.rarityTagText}>{rarityInfo.rarity}</Text>
-                        </View>
-                        <Text style={styles.statTotalText}>Total: {statTotal}</Text>
-                        <Text style={styles.rewardText}>+{item.tokenReward} token{item.tokenReward > 1 ? 's' : ''}</Text>
-                      </View>
-                    </>
-                  )}
-                </View>
-              </Pressable>
+                isCurrent={isCurrent}
+                isUnlocked={isUnlocked}
+                isBeaten={isBeaten}
+                index={index}
+                name={item.name}
+                lore={item.lore}
+                imageAsset={item.imageAsset}
+                rarity={rarityInfo.rarity}
+                rarityColor={rarityInfo.color}
+                statTotal={statTotal}
+                tokenReward={item.tokenReward}
+              />
             );
           }}
         />
       </SafeAreaView>
-    </LinearGradient>
+    </View>
+  );
+}
+
+function QuickBattleButton({ onPress }: { onPress: () => void }) {
+  const { animatedStyle, onPressIn, onPressOut } = useSparkPress(0.97);
+  return (
+    <Animated.View style={[styles.quickBattleWrap, animatedStyle]}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        style={({ pressed }) => [
+          styles.quickBattleButton,
+          pressed && { backgroundColor: sparkTheme.colors.brandHover },
+        ]}
+      >
+        <View style={styles.quickBattleLeft}>
+          <Text style={styles.quickBattleEyebrow}>RANDOM ENCOUNTER</Text>
+          <Text style={styles.quickBattleText}>Quick Battle</Text>
+          <Text style={styles.quickBattleSubtext}>
+            Random opponent from your unlocked roster — earn 1 token on victory.
+          </Text>
+        </View>
+        <Text style={styles.quickBattleArrow}>→</Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+interface BossCardProps {
+  onPress: () => void;
+  disabled: boolean;
+  isCurrent: boolean;
+  isUnlocked: boolean;
+  isBeaten: boolean;
+  index: number;
+  name: string;
+  lore: string;
+  imageAsset?: any;
+  rarity: string;
+  rarityColor: string;
+  statTotal: number;
+  tokenReward: number;
+}
+
+function BossCard({
+  onPress,
+  disabled,
+  isCurrent,
+  isUnlocked,
+  isBeaten,
+  index,
+  name,
+  lore,
+  imageAsset,
+  rarity,
+  rarityColor,
+  statTotal,
+  tokenReward,
+}: BossCardProps) {
+  const { animatedStyle, onPressIn, onPressOut } = useSparkLift(3);
+
+  return (
+    <Animated.View style={[disabled ? null : animatedStyle]}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={disabled ? undefined : onPressIn}
+        onPressOut={disabled ? undefined : onPressOut}
+        disabled={disabled}
+        style={[
+          styles.bossCard,
+          isCurrent && { borderColor: sparkTheme.colors.brand, borderWidth: 2 },
+          !isUnlocked && styles.bossLocked,
+        ]}
+      >
+        <View style={styles.bossLeft}>
+          {isUnlocked && imageAsset ? (
+            <Image source={imageAsset} style={styles.bossThumb} resizeMode="cover" />
+          ) : (
+            <View style={[styles.bossNumber, isBeaten && styles.bossNumberBeaten]}>
+              <Text
+                style={[
+                  styles.bossNumberText,
+                  isBeaten && { color: sparkTheme.colors.brand },
+                ]}
+              >
+                {isBeaten ? '✓' : index + 1}
+              </Text>
+            </View>
+          )}
+          {isCurrent && (
+            <View style={styles.currentDot}>
+              <Text style={styles.currentDotText}>NEXT</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.bossInfo}>
+          <Text style={[styles.bossName, !isUnlocked && styles.textLocked]} numberOfLines={1}>
+            {isUnlocked ? name : '? ? ?'}
+          </Text>
+          {isUnlocked ? (
+            <>
+              <Text style={styles.bossLore} numberOfLines={2}>{lore}</Text>
+              <View style={styles.bossTagRow}>
+                <View style={[styles.rarityTag, { backgroundColor: rarityColor }]}>
+                  <Text style={styles.rarityTagText}>{rarity.toUpperCase()}</Text>
+                </View>
+                <Text style={styles.statTotalText}>Σ {statTotal}</Text>
+                <Text style={styles.rewardText}>+{tokenReward} token{tokenReward > 1 ? 's' : ''}</Text>
+              </View>
+            </>
+          ) : (
+            <Text style={styles.bossLore}>Defeat the previous opponent to reveal this fight.</Text>
+          )}
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  gradient: { flex: 1 },
+  root: {
+    flex: 1,
+    backgroundColor: sparkTheme.colors.bg,
+  },
   safeArea: { flex: 1 },
-  header: {
+
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
+    paddingHorizontal: sparkTheme.spacing[5],
+    paddingTop: sparkTheme.spacing[5],
+    paddingBottom: sparkTheme.spacing[5],
+    gap: sparkTheme.spacing[5],
   },
-  backButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: theme.radius.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(184, 160, 255, 0.25)',
-    backgroundColor: 'rgba(184, 160, 255, 0.08)',
-  },
-  backText: {
-    color: theme.colors.primary,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  headerTitle: {
+  titleBlock: {
     flex: 1,
-    color: theme.colors.text,
-    fontSize: 22,
-    fontWeight: '800',
-    letterSpacing: 1,
-    textAlign: 'center',
-    marginRight: 56,
+    alignItems: 'center',
+    gap: sparkTheme.spacing[1],
   },
+  headerSpacer: {
+    width: 88,
+  },
+  eyebrow: {
+    color: sparkTheme.colors.brand,
+    fontSize: sparkTheme.type.micro.fontSize,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
+  title: {
+    color: sparkTheme.colors.textPrimary,
+    fontSize: 28,
+    lineHeight: 32,
+    fontWeight: '800',
+  },
+
   completedBanner: {
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 12,
-    borderRadius: theme.radius.sm,
-    backgroundColor: 'rgba(255, 215, 0, 0.12)',
+    marginHorizontal: sparkTheme.spacing[5],
+    marginBottom: sparkTheme.spacing[5],
+    paddingHorizontal: sparkTheme.spacing[5],
+    paddingVertical: sparkTheme.spacing[4],
+    borderRadius: sparkTheme.radius.md,
+    backgroundColor: 'rgba(255, 215, 0, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(255, 215, 0, 0.4)',
     alignItems: 'center',
+    gap: sparkTheme.spacing[1],
   },
   completedText: {
     color: '#FFD700',
     fontSize: 16,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 1.5,
+  },
+  completedSubtext: {
+    color: sparkTheme.colors.textMuted,
+    fontSize: sparkTheme.type.small.fontSize,
+    lineHeight: sparkTheme.type.small.lineHeight,
+    textAlign: 'center',
+  },
+
+  // Quick Battle
+  quickBattleWrap: {
+    marginHorizontal: sparkTheme.spacing[5],
+    marginBottom: sparkTheme.spacing[6],
   },
   quickBattleButton: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primaryStrong,
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'space-between',
+    paddingHorizontal: sparkTheme.spacing[6],
+    paddingVertical: sparkTheme.spacing[6],
+    borderRadius: sparkTheme.radius.lg,
+    backgroundColor: sparkTheme.colors.brand,
+    gap: sparkTheme.spacing[5],
+    ...sparkTheme.shadow.brand,
   },
-  quickBattleText: {
-    color: theme.colors.text,
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 1,
+  quickBattleLeft: {
+    flex: 1,
+    gap: sparkTheme.spacing[1],
+  },
+  quickBattleEyebrow: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: sparkTheme.type.micro.fontSize,
+    fontWeight: '700',
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
-  quickBattleSubtext: {
-    color: 'rgba(246, 244, 255, 0.6)',
-    fontSize: 11,
+  quickBattleText: {
+    color: sparkTheme.colors.textPrimary,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
-  sectionTitle: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
+  quickBattleSubtext: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: sparkTheme.type.small.fontSize,
+    lineHeight: sparkTheme.type.small.lineHeight,
+  },
+  quickBattleArrow: {
+    color: sparkTheme.colors.textPrimary,
+    fontSize: 28,
+    fontWeight: '800',
+  },
+
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingHorizontal: sparkTheme.spacing[5],
+    marginBottom: sparkTheme.spacing[4],
+  },
+  sectionEyebrow: {
+    color: sparkTheme.colors.textMuted,
+    fontSize: sparkTheme.type.micro.fontSize,
     fontWeight: '700',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
-    paddingHorizontal: 16,
-    marginBottom: 8,
   },
+  sectionMeta: {
+    color: sparkTheme.colors.brand,
+    fontSize: sparkTheme.type.micro.fontSize,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+
   list: {
-    paddingHorizontal: 16,
-    paddingBottom: 32,
-    gap: 10,
+    paddingHorizontal: sparkTheme.spacing[5],
+    paddingBottom: sparkTheme.spacing[8],
+    gap: sparkTheme.spacing[3],
   },
+
   bossCard: {
     flexDirection: 'row',
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.md,
+    backgroundColor: sparkTheme.colors.bgElevated,
+    borderRadius: sparkTheme.radius.md,
     borderWidth: 1,
-    borderColor: theme.colors.panelBorder,
-    padding: 14,
-    gap: 14,
+    borderColor: sparkTheme.colors.border,
+    padding: sparkTheme.spacing[4],
+    gap: sparkTheme.spacing[5],
   },
   bossLocked: {
-    opacity: 0.4,
+    opacity: 0.45,
   },
   bossLeft: {
-    justifyContent: 'flex-start',
+    alignItems: 'center',
+    gap: sparkTheme.spacing[2],
   },
   bossThumb: {
-    width: 48,
-    height: 64,
-    borderRadius: 8,
-    backgroundColor: theme.colors.panel,
+    width: 56,
+    height: 76,
+    borderRadius: sparkTheme.radius.sm,
+    backgroundColor: sparkTheme.colors.bg,
+    borderWidth: 1,
+    borderColor: sparkTheme.colors.border,
   },
   bossNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(184, 160, 255, 0.15)',
+    width: 56,
+    height: 76,
+    borderRadius: sparkTheme.radius.sm,
+    backgroundColor: sparkTheme.colors.bg,
+    borderWidth: 1,
+    borderColor: sparkTheme.colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   bossNumberBeaten: {
-    backgroundColor: 'rgba(115, 240, 205, 0.2)',
+    backgroundColor: sparkTheme.colors.brandSoft,
+    borderColor: sparkTheme.colors.brandBorder,
   },
   bossNumberText: {
-    color: theme.colors.text,
-    fontSize: 14,
-    fontWeight: '700',
+    color: sparkTheme.colors.textMuted,
+    fontSize: 18,
+    fontWeight: '800',
   },
+  currentDot: {
+    paddingHorizontal: sparkTheme.spacing[2],
+    paddingVertical: 2,
+    borderRadius: sparkTheme.radius.pill,
+    backgroundColor: sparkTheme.colors.brand,
+  },
+  currentDotText: {
+    color: sparkTheme.colors.textPrimary,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+
   bossInfo: {
     flex: 1,
-    gap: 4,
+    gap: sparkTheme.spacing[1],
   },
   bossName: {
-    color: theme.colors.text,
+    color: sparkTheme.colors.textPrimary,
     fontSize: 15,
     fontWeight: '700',
   },
   textLocked: {
-    color: theme.colors.textMuted,
+    color: sparkTheme.colors.textDim,
+    letterSpacing: 2,
   },
   bossLore: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
-    lineHeight: 16,
+    color: sparkTheme.colors.textMuted,
+    fontSize: sparkTheme.type.micro.fontSize,
+    lineHeight: sparkTheme.type.micro.lineHeight,
   },
   bossTagRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
+    gap: sparkTheme.spacing[3],
+    marginTop: sparkTheme.spacing[2],
+    flexWrap: 'wrap',
   },
   rarityTag: {
-    paddingHorizontal: 6,
+    paddingHorizontal: sparkTheme.spacing[2],
     paddingVertical: 2,
     borderRadius: 4,
   },
   rarityTagText: {
-    color: '#090B13',
+    color: '#000000',
     fontSize: 9,
     fontWeight: '800',
+    letterSpacing: 0.5,
   },
   statTotalText: {
-    color: theme.colors.textMuted,
-    fontSize: 10,
+    color: sparkTheme.colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
   rewardText: {
-    color: theme.colors.accent,
-    fontSize: 10,
-    fontWeight: '600',
+    color: sparkTheme.colors.brand,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });
