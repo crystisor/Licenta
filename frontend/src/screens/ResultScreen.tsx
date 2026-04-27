@@ -8,6 +8,7 @@ import {
   NativeSyntheticEvent,
   Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -17,10 +18,12 @@ import { Video, ResizeMode } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { theme } from '../theme';
+import { sparkTheme } from '../theme';
 import { CardMeta, GeneratedImage } from '../types';
 import { getRarity, RarityInfo } from '../utils/rarity';
 import { MOTION_SUGGESTIONS } from '../data/promptTemplates';
+import { SparkAmbient } from '../components/spark/SparkAmbient';
+import { SparkBackButton } from '../components/spark/SparkBackButton';
 
 const FALLBACK_META: CardMeta = {
   title: 'The Unnamed',
@@ -61,6 +64,7 @@ export function ResultScreen({
   const imageSettledRef = useRef(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [motionPrompt, setMotionPrompt] = useState('');
+  const [motionFocused, setMotionFocused] = useState(false);
 
   // Entrance animation
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -76,7 +80,6 @@ export function ResultScreen({
     outputRange: ['0deg', '1080deg'],
   });
 
-  // Card back color fades out as the flip progresses
   const cardBackOpacity = flipAnim.interpolate({
     inputRange: [0, 900, 1080],
     outputRange: [1, 1, 0],
@@ -84,74 +87,38 @@ export function ResultScreen({
 
   useEffect(() => {
     if (fromHistory) {
-      // Simple fade-in for history replay — no card flip
       flipAnim.setValue(1080);
       scaleAnim.setValue(1);
       cardFaceOpacity.setValue(1);
       Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
+        Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
       ]).start();
       return;
     }
 
-    // Fade + slide in the page, start flipping immediately
     Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      // 3 full flips
+      Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
       Animated.timing(flipAnim, {
         toValue: 1080,
         duration: 2400,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
-      // Scale up during the flip
       Animated.timing(scaleAnim, {
         toValue: 0.95,
         duration: 2400,
         useNativeDriver: true,
       }),
     ]).start(() => {
-      // Reveal the card face content
-      Animated.timing(cardFaceOpacity, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-
-      // Push into screen: scale 0.95 → 1.05 → 1.0
+      Animated.timing(cardFaceOpacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
       Animated.sequence([
-        Animated.spring(scaleAnim, {
-          toValue: 1.05,
-          friction: 6,
-          tension: 80,
-          useNativeDriver: true,
-        }),
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          friction: 10,
-          tension: 100,
-          useNativeDriver: true,
-        }),
+        Animated.spring(scaleAnim, { toValue: 1.05, friction: 6, tension: 80, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, friction: 10, tension: 100, useNativeDriver: true }),
       ]).start();
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleImageLoad = () => {
@@ -161,9 +128,7 @@ export function ResultScreen({
     onImageLoad?.();
   };
 
-  const handleImageError = (
-    event: NativeSyntheticEvent<ImageErrorEventData>,
-  ) => {
+  const handleImageError = (event: NativeSyntheticEvent<ImageErrorEventData>) => {
     if (imageSettledRef.current) return;
     imageSettledRef.current = true;
     onImageError?.(event.nativeEvent.error || 'Image failed to load.');
@@ -173,12 +138,25 @@ export function ResultScreen({
   const statEntries = Object.entries(meta.stats);
   const rarityInfo: RarityInfo = getRarity(meta.stats, meta.creativity);
 
+  const animateDisabled = isAnimating || videoJobActive || !motionPrompt.trim();
+
   return (
-    <LinearGradient
-      colors={[theme.colors.backgroundTop, theme.colors.backgroundBottom]}
-      style={styles.gradient}
-    >
+    <View style={styles.root}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient
+        colors={[sparkTheme.colors.bgGradientTop, sparkTheme.colors.bgGradientBottom]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+      />
+      <SparkAmbient />
+
       <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+        <View style={styles.headerRow}>
+          <SparkBackButton onPress={onReset} label={fromHistory ? '← Gallery' : '← Home'} />
+          <View style={styles.headerSpacer} />
+        </View>
+
         <ScrollView
           bounces={false}
           contentContainerStyle={styles.scrollContent}
@@ -187,23 +165,28 @@ export function ResultScreen({
           <Animated.View
             style={[
               styles.content,
-              {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }],
-              },
+              { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
             ]}
           >
             {/* ── Portrait Card ── */}
-            <Animated.View style={[styles.card, { borderColor: rarityInfo.color, transform: [{ perspective: 1000 }, { rotateY: flipInterpolate }, { scale: scaleAnim }] }]}>
-              {/* Card back — solid surface visible during flips, fades out at the end */}
+            <Animated.View
+              style={[
+                styles.card,
+                {
+                  borderColor: rarityInfo.color,
+                  transform: [
+                    { perspective: 1000 },
+                    { rotateY: flipInterpolate },
+                    { scale: scaleAnim },
+                  ],
+                },
+              ]}
+            >
               <Animated.View style={[styles.cardBack, { opacity: cardBackOpacity }]} pointerEvents="none" />
 
-              {/* Card face — hidden during flips, revealed after */}
               <Animated.View style={{ opacity: cardFaceOpacity }}>
-                {/* Decorative inner border */}
                 <View style={styles.innerBorder} pointerEvents="none" />
 
-                {/* Portrait image */}
                 <View style={styles.portraitContainer}>
                   <Image
                     source={{ uri: result.imageUrl }}
@@ -212,20 +195,14 @@ export function ResultScreen({
                     onLoad={handleImageLoad}
                     onError={handleImageError}
                   />
-                  {/* Overlay tint */}
                   <View style={styles.portraitOverlay} />
-                  {/* Loading indicator */}
                   {!imageLoaded && (
                     <View style={styles.loadingContainer}>
-                      <ActivityIndicator
-                        size="large"
-                        color={theme.colors.primary}
-                      />
+                      <ActivityIndicator size="large" color={sparkTheme.colors.brand} />
                     </View>
                   )}
                 </View>
 
-                {/* Title banner */}
                 <View style={styles.bannerWrapper}>
                   <View style={styles.banner}>
                     <Text style={styles.bannerText}>{meta.title}</Text>
@@ -235,33 +212,22 @@ export function ResultScreen({
                   </View>
                 </View>
 
-                {/* Description */}
                 <View style={styles.descriptionContainer}>
-                  <Text style={styles.descriptionLabel}>Description:</Text>
+                  <Text style={styles.descriptionLabel}>DESCRIPTION</Text>
                   <Text style={styles.descriptionText}>{result.prompt}</Text>
                 </View>
               </Animated.View>
             </Animated.View>
 
             {/* ── Stats Grid ── */}
-            <View style={styles.statsCard}>
-              <View style={styles.statsHeader}>
-                <View>
-                  <Text style={styles.statsTitle}>Attributes</Text>
-                  <Text style={styles.statsSubtitle}>Character stats</Text>
-                </View>
+            <View style={styles.panel}>
+              <View style={styles.panelHeader}>
+                <Text style={styles.panelEyebrow}>STATS</Text>
+                <Text style={styles.panelTitle}>Attributes</Text>
               </View>
               <View style={styles.statsGrid}>
-                {statEntries.map(([key, value], idx) => (
-                  <View
-                    key={key}
-                    style={[
-                      styles.statCell,
-                      idx % 2 === 0
-                        ? styles.statCellEven
-                        : styles.statCellOdd,
-                    ]}
-                  >
+                {statEntries.map(([key, value]) => (
+                  <View key={key} style={styles.statCell}>
                     <Text style={styles.statLabel}>{key}</Text>
                     <Text style={styles.statValue}>{String(value)}</Text>
                   </View>
@@ -270,62 +236,78 @@ export function ResultScreen({
             </View>
 
             {/* ── Lore Section ── */}
-            <View style={styles.loreCard}>
+            <View style={styles.lorePanel}>
               <Text style={styles.loreText}>
-                {'\u201C'}
+                {'“'}
                 {meta.lore}
-                {'\u201D'}
+                {'”'}
               </Text>
             </View>
 
-            {/* ── Animate Section (hidden in history replay) ── */}
+            {/* ── Animate Section ── */}
             {!fromHistory && (
-              <View style={styles.animateCard}>
-                <Text style={styles.animateTitle}>Animate</Text>
-                <Text style={styles.animateSubtitle}>
-                  {videoJobActive ? 'Video already generating...' : 'Bring this image to life'}
-                </Text>
+              <View style={styles.panel}>
+                <View style={styles.panelHeader}>
+                  <Text style={styles.panelEyebrow}>I2V PIPELINE</Text>
+                  <Text style={styles.panelTitle}>Animate</Text>
+                  <Text style={styles.panelSubtitle}>
+                    {videoJobActive
+                      ? 'Video already generating…'
+                      : 'Bring this card to life with Wan 2.2'}
+                  </Text>
+                </View>
+
                 <TextInput
-                  style={styles.motionInput}
+                  style={[
+                    styles.motionInput,
+                    {
+                      borderColor: motionFocused
+                        ? sparkTheme.colors.brandBorder
+                        : sparkTheme.colors.border,
+                    },
+                  ]}
                   placeholder="Describe the motion (e.g. camera slowly zooms in, wind blows hair...)"
-                  placeholderTextColor={theme.colors.textMuted}
+                  placeholderTextColor={sparkTheme.colors.textDim}
                   value={motionPrompt}
                   onChangeText={setMotionPrompt}
+                  onFocus={() => setMotionFocused(true)}
+                  onBlur={() => setMotionFocused(false)}
                   multiline
                   numberOfLines={3}
                   editable={!isAnimating && !videoJobActive}
                 />
+
                 <View style={styles.motionChipRow}>
-                  {MOTION_SUGGESTIONS.map((suggestion) => (
-                    <Pressable
-                      key={suggestion}
-                      onPress={() => setMotionPrompt(suggestion)}
-                      disabled={isAnimating || videoJobActive}
-                      style={[
-                        styles.motionChip,
-                        motionPrompt === suggestion && styles.motionChipActive,
-                      ]}
-                    >
-                      <Text style={[
-                        styles.motionChipText,
-                        motionPrompt === suggestion && styles.motionChipTextActive,
-                      ]}>{suggestion}</Text>
-                    </Pressable>
-                  ))}
+                  {MOTION_SUGGESTIONS.map((suggestion) => {
+                    const active = motionPrompt === suggestion;
+                    return (
+                      <Pressable
+                        key={suggestion}
+                        onPress={() => setMotionPrompt(suggestion)}
+                        disabled={isAnimating || videoJobActive}
+                        style={[styles.motionChip, active && styles.motionChipActive]}
+                      >
+                        <Text style={[styles.motionChipText, active && styles.motionChipTextActive]}>
+                          {suggestion}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
+
                 <Pressable
                   onPress={() => onAnimate(motionPrompt)}
-                  disabled={isAnimating || videoJobActive || !motionPrompt.trim()}
+                  disabled={animateDisabled}
                   style={({ pressed }) => [
                     styles.animateButton,
-                    pressed && styles.animateButtonPressed,
-                    (isAnimating || videoJobActive || !motionPrompt.trim()) && styles.animateButtonDisabled,
+                    animateDisabled && styles.animateButtonDisabled,
+                    pressed && !animateDisabled && { backgroundColor: sparkTheme.colors.brandHover },
                   ]}
                 >
                   {isAnimating ? (
                     <View style={styles.animateButtonContent}>
-                      <ActivityIndicator size="small" color={theme.colors.text} />
-                      <Text style={styles.animateButtonText}>Starting...</Text>
+                      <ActivityIndicator size="small" color={sparkTheme.colors.textPrimary} />
+                      <Text style={styles.animateButtonText}>Starting…</Text>
                     </View>
                   ) : (
                     <Text style={styles.animateButtonText}>Animate</Text>
@@ -336,8 +318,11 @@ export function ResultScreen({
 
             {/* ── Video Player ── */}
             {videoUrl && (
-              <View style={styles.videoCard}>
-                <Text style={styles.videoTitle}>Generated Video</Text>
+              <View style={styles.videoPanel}>
+                <View style={styles.panelHeader}>
+                  <Text style={styles.panelEyebrow}>OUTPUT</Text>
+                  <Text style={styles.panelTitle}>Generated Video</Text>
+                </View>
                 <View style={styles.videoContainer}>
                   <Video
                     source={{ uri: videoUrl }}
@@ -355,11 +340,11 @@ export function ResultScreen({
             <Pressable
               onPress={onReset}
               style={({ pressed }) => [
-                styles.button,
-                pressed && styles.buttonPressed,
+                styles.primaryButton,
+                pressed && { backgroundColor: sparkTheme.colors.brandHover },
               ]}
             >
-              <Text style={styles.buttonText}>
+              <Text style={styles.primaryButtonText}>
                 {fromHistory ? 'Back to Gallery' : 'Generate Another'}
               </Text>
             </Pressable>
@@ -368,78 +353,83 @@ export function ResultScreen({
           </Animated.View>
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  gradient: {
+  root: {
     flex: 1,
+    backgroundColor: sparkTheme.colors.bg,
   },
   safeArea: {
     flex: 1,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: sparkTheme.spacing[5],
+    paddingTop: sparkTheme.spacing[5],
+    paddingBottom: sparkTheme.spacing[3],
+  },
+  headerSpacer: {
+    width: 1,
+  },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 32,
+    paddingHorizontal: sparkTheme.spacing[5],
+    paddingTop: sparkTheme.spacing[3],
+    paddingBottom: sparkTheme.spacing[8],
   },
   content: {
-    maxWidth: 448,
+    maxWidth: 480,
     width: '100%',
     alignSelf: 'center',
-    gap: 18,
-  },
-
-  // ── Card Back (visible during flip) ──
-  cardBack: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.lg - 1,
-    zIndex: 10,
+    gap: sparkTheme.spacing[5],
   },
 
   // ── Portrait Card ──
+  cardBack: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: sparkTheme.colors.bgElevated,
+    borderRadius: sparkTheme.radius.lg - 1,
+    zIndex: 10,
+  },
   card: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.panelBorder,
+    backgroundColor: sparkTheme.colors.bgElevated,
+    borderRadius: sparkTheme.radius.lg,
+    borderWidth: 2,
     overflow: 'hidden',
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.7,
-    shadowRadius: 24,
-    elevation: 12,
+    padding: sparkTheme.spacing[4],
+    ...sparkTheme.shadow.brand,
   },
   innerBorder: {
     position: 'absolute',
-    top: 8,
-    left: 8,
-    right: 8,
-    bottom: 8,
+    top: sparkTheme.spacing[3],
+    left: sparkTheme.spacing[3],
+    right: sparkTheme.spacing[3],
+    bottom: sparkTheme.spacing[3],
     borderWidth: 1,
-    borderColor: 'rgba(184, 160, 255, 0.1)',
-    borderRadius: theme.radius.lg - 4,
+    borderColor: sparkTheme.colors.brandSoftHover,
+    borderRadius: sparkTheme.radius.lg - 4,
     zIndex: 1,
   },
   portraitContainer: {
     width: '100%',
     aspectRatio: 2 / 3,
-    borderRadius: theme.radius.sm,
+    borderRadius: sparkTheme.radius.sm,
     overflow: 'hidden',
-    backgroundColor: theme.colors.panel,
-    borderWidth: 2,
-    borderColor: '#1c1b2e',
+    backgroundColor: sparkTheme.colors.bg,
+    borderWidth: 1,
+    borderColor: sparkTheme.colors.border,
   },
   portraitImage: {
     ...StyleSheet.absoluteFillObject,
   },
   portraitOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(5, 7, 14, 0.12)',
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
   },
   loadingContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -450,35 +440,31 @@ const styles = StyleSheet.create({
   // ── Title Banner ──
   bannerWrapper: {
     alignItems: 'center',
-    marginTop: -24,
+    marginTop: -22,
     zIndex: 2,
   },
   banner: {
-    backgroundColor: theme.colors.primaryStrong,
-    paddingHorizontal: 28,
-    paddingVertical: 6,
+    backgroundColor: sparkTheme.colors.brand,
+    paddingHorizontal: sparkTheme.spacing[7],
+    paddingVertical: sparkTheme.spacing[2],
     borderRadius: 4,
     transform: [{ rotate: '-1deg' }],
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 6,
+    ...sparkTheme.shadow.brand,
   },
   bannerText: {
-    color: theme.colors.text,
+    color: sparkTheme.colors.textPrimary,
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: 1,
   },
   rarityBadge: {
-    marginTop: 6,
-    paddingHorizontal: 14,
+    marginTop: sparkTheme.spacing[2],
+    paddingHorizontal: sparkTheme.spacing[5],
     paddingVertical: 3,
     borderRadius: 4,
   },
   rarityBadgeText: {
-    color: '#090B13',
+    color: '#000000',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1.5,
@@ -486,240 +472,209 @@ const styles = StyleSheet.create({
 
   // ── Description ──
   descriptionContainer: {
-    marginTop: 16,
-    backgroundColor: theme.colors.panel,
-    borderRadius: theme.radius.sm,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(184, 160, 255, 0.15)',
+    marginTop: sparkTheme.spacing[5],
+    backgroundColor: sparkTheme.colors.bg,
+    borderRadius: sparkTheme.radius.sm,
+    paddingHorizontal: sparkTheme.spacing[5],
+    paddingVertical: sparkTheme.spacing[4],
+    borderWidth: 1,
+    borderColor: sparkTheme.colors.border,
   },
   descriptionLabel: {
-    color: theme.colors.primary,
-    fontSize: 14,
+    color: sparkTheme.colors.brand,
+    fontSize: sparkTheme.type.micro.fontSize,
     fontWeight: '700',
-    marginBottom: 4,
+    letterSpacing: 1.4,
+    marginBottom: sparkTheme.spacing[1],
   },
   descriptionText: {
-    color: theme.colors.textMuted,
-    fontSize: 15,
-    lineHeight: 22,
+    color: sparkTheme.colors.textSecondary,
+    fontSize: sparkTheme.type.body.fontSize,
+    lineHeight: sparkTheme.type.body.lineHeight,
     fontStyle: 'italic',
-    textAlign: 'center',
+  },
+
+  // ── Generic panel ──
+  panel: {
+    backgroundColor: sparkTheme.colors.bgElevated,
+    borderRadius: sparkTheme.radius.lg,
+    borderWidth: 1,
+    borderColor: sparkTheme.colors.border,
+    padding: sparkTheme.spacing[7],
+    gap: sparkTheme.spacing[5],
+  },
+  panelHeader: {
+    gap: sparkTheme.spacing[1],
+  },
+  panelEyebrow: {
+    color: sparkTheme.colors.brand,
+    fontSize: sparkTheme.type.micro.fontSize,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
+  panelTitle: {
+    color: sparkTheme.colors.textPrimary,
+    fontSize: sparkTheme.type.h3.fontSize,
+    lineHeight: sparkTheme.type.h3.lineHeight,
+    fontWeight: '700',
+  },
+  panelSubtitle: {
+    color: sparkTheme.colors.textMuted,
+    fontSize: sparkTheme.type.small.fontSize,
+    lineHeight: sparkTheme.type.small.lineHeight,
   },
 
   // ── Stats Grid ──
-  statsCard: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.panelBorder,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  statsHeader: {
-    marginBottom: 16,
-  },
-  statsTitle: {
-    color: theme.colors.primary,
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-  },
-  statsSubtitle: {
-    color: theme.colors.textMuted,
-    fontSize: 10,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    marginTop: 2,
-    opacity: 0.6,
-  },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: sparkTheme.spacing[3],
   },
   statCell: {
-    width: '33.33%',
+    flexBasis: '30%',
+    flexGrow: 1,
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    borderBottomWidth: 2,
-    borderBottomColor: 'rgba(184, 160, 255, 0.15)',
-  },
-  statCellEven: {
-    backgroundColor: theme.colors.card,
-  },
-  statCellOdd: {
-    backgroundColor: theme.colors.panel,
+    paddingVertical: sparkTheme.spacing[4],
+    paddingHorizontal: sparkTheme.spacing[3],
+    backgroundColor: sparkTheme.colors.bg,
+    borderRadius: sparkTheme.radius.sm,
+    borderWidth: 1,
+    borderColor: sparkTheme.colors.border,
   },
   statLabel: {
-    color: theme.colors.textMuted,
+    color: sparkTheme.colors.textDim,
     fontSize: 10,
-    fontWeight: '500',
+    fontWeight: '600',
     letterSpacing: 1,
     textTransform: 'uppercase',
-    marginBottom: 4,
+    marginBottom: sparkTheme.spacing[1],
   },
   statValue: {
-    color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: '700',
+    color: sparkTheme.colors.textPrimary,
+    fontSize: 22,
+    fontWeight: '800',
   },
 
   // ── Lore ──
-  loreCard: {
-    backgroundColor: theme.colors.card,
-    borderLeftWidth: 4,
-    borderLeftColor: 'rgba(184, 160, 255, 0.5)',
-    padding: 20,
-    borderRadius: theme.radius.sm,
+  lorePanel: {
+    backgroundColor: sparkTheme.colors.bgElevated,
+    borderLeftWidth: 3,
+    borderLeftColor: sparkTheme.colors.brand,
+    borderTopWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderTopColor: sparkTheme.colors.border,
+    borderRightColor: sparkTheme.colors.border,
+    borderBottomColor: sparkTheme.colors.border,
+    padding: sparkTheme.spacing[6],
+    borderRadius: sparkTheme.radius.md,
   },
   loreText: {
-    color: theme.colors.textMuted,
-    fontSize: 15,
-    lineHeight: 24,
+    color: sparkTheme.colors.textSecondary,
+    fontSize: sparkTheme.type.body.fontSize,
+    lineHeight: sparkTheme.type.body.lineHeight,
     fontStyle: 'italic',
   },
 
-  // ── Button ──
-  button: {
-    minHeight: 54,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(184, 160, 255, 0.35)',
-    backgroundColor: 'rgba(184, 160, 255, 0.12)',
-  },
-  buttonPressed: {
-    transform: [{ scale: 0.98 }],
-    backgroundColor: 'rgba(184, 160, 255, 0.2)',
-  },
-  buttonText: {
-    color: theme.colors.text,
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-
-  // ── Animate Section ──
-  animateCard: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: theme.colors.panelBorder,
-    padding: 20,
-    gap: 12,
-  },
-  animateTitle: {
-    color: theme.colors.primary,
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-  },
-  animateSubtitle: {
-    color: theme.colors.textMuted,
-    fontSize: 10,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    opacity: 0.6,
-    marginTop: -8,
-  },
+  // ── Animate ──
   motionInput: {
-    backgroundColor: theme.colors.panel,
-    borderRadius: theme.radius.sm,
+    backgroundColor: sparkTheme.colors.bg,
+    borderRadius: sparkTheme.radius.sm,
     borderWidth: 1,
-    borderColor: 'rgba(111, 119, 203, 0.2)',
-    color: theme.colors.text,
-    fontSize: 14,
-    lineHeight: 20,
-    padding: 14,
+    color: sparkTheme.colors.textPrimary,
+    fontSize: sparkTheme.type.small.fontSize,
+    lineHeight: sparkTheme.type.small.lineHeight,
+    padding: sparkTheme.spacing[4],
     minHeight: 80,
     textAlignVertical: 'top',
   },
   motionChipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: sparkTheme.spacing[2],
   },
   motionChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: theme.radius.pill,
-    backgroundColor: 'rgba(184, 160, 255, 0.08)',
+    paddingHorizontal: sparkTheme.spacing[4],
+    paddingVertical: sparkTheme.spacing[2],
+    borderRadius: sparkTheme.radius.pill,
+    backgroundColor: sparkTheme.colors.bg,
     borderWidth: 1,
-    borderColor: 'rgba(184, 160, 255, 0.2)',
+    borderColor: sparkTheme.colors.border,
   },
   motionChipActive: {
-    borderColor: theme.colors.primaryStrong,
-    backgroundColor: 'rgba(184, 160, 255, 0.18)',
+    borderColor: sparkTheme.colors.brandBorder,
+    backgroundColor: sparkTheme.colors.brandSoft,
   },
   motionChipText: {
-    color: theme.colors.textMuted,
+    color: sparkTheme.colors.textMuted,
     fontSize: 11,
     fontWeight: '600',
   },
   motionChipTextActive: {
-    color: theme.colors.text,
+    color: sparkTheme.colors.brand,
   },
   animateButton: {
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.primaryStrong,
-  },
-  animateButtonPressed: {
-    transform: [{ scale: 0.98 }],
-    opacity: 0.9,
+    borderRadius: sparkTheme.radius.md,
+    backgroundColor: sparkTheme.colors.brand,
+    ...sparkTheme.shadow.brand,
   },
   animateButtonDisabled: {
     opacity: 0.4,
+    shadowOpacity: 0,
   },
   animateButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: sparkTheme.spacing[3],
   },
   animateButtonText: {
-    color: theme.colors.text,
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    color: sparkTheme.colors.textPrimary,
+    fontSize: sparkTheme.type.body.fontSize,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 
-  // ── Video Player ──
-  videoCard: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.lg,
+  // ── Video ──
+  videoPanel: {
+    backgroundColor: sparkTheme.colors.bgElevated,
+    borderRadius: sparkTheme.radius.lg,
     borderWidth: 1,
-    borderColor: theme.colors.panelBorder,
+    borderColor: sparkTheme.colors.border,
     overflow: 'hidden',
-  },
-  videoTitle: {
-    color: theme.colors.primary,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
+    paddingTop: sparkTheme.spacing[7],
+    paddingHorizontal: sparkTheme.spacing[7],
+    paddingBottom: 0,
+    gap: sparkTheme.spacing[5],
   },
   videoContainer: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: theme.colors.panel,
+    backgroundColor: sparkTheme.colors.bg,
+    marginHorizontal: -sparkTheme.spacing[7],
+    marginBottom: 0,
   },
   videoPlayer: {
     width: '100%',
     height: '100%',
+  },
+
+  // ── Primary action button (bottom) ──
+  primaryButton: {
+    minHeight: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: sparkTheme.radius.md,
+    backgroundColor: sparkTheme.colors.brand,
+    ...sparkTheme.shadow.brand,
+  },
+  primaryButtonText: {
+    color: sparkTheme.colors.textPrimary,
+    fontSize: sparkTheme.type.body.fontSize,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });

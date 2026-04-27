@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { fetchCard } from '../services/api';
 import { ResultScreen } from './ResultScreen';
-import { theme } from '../theme';
+import { sparkTheme } from '../theme';
 import { GalleryEntry, GeneratedImage } from '../types';
 
 export function HistoryDetailScreen() {
@@ -35,7 +35,7 @@ export function HistoryDetailScreen() {
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <ActivityIndicator size="large" color={sparkTheme.colors.brand} />
       </View>
     );
   }
@@ -68,6 +68,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: theme.colors.backgroundTop,
+    backgroundColor: sparkTheme.colors.bg,
   },
 });
