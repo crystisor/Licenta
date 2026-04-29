@@ -1,0 +1,695 @@
+{
+  "transitions": [
+    {
+      "property": "color",
+      "duration": "0.15s",
+      "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "delay": "0s",
+      "count": 20
+    },
+    {
+      "property": "background-color",
+      "duration": "0.15s",
+      "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "delay": "0s",
+      "count": 20
+    },
+    {
+      "property": "border-color",
+      "duration": "0.15s",
+      "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "delay": "0s",
+      "count": 20
+    },
+    {
+      "property": "text-decoration-color",
+      "duration": "0.15s",
+      "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "delay": "0s",
+      "count": 20
+    },
+    {
+      "property": "fill",
+      "duration": "0.15s",
+      "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "delay": "0s",
+      "count": 20
+    },
+    {
+      "property": "stroke",
+      "duration": "0.15s",
+      "easing": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "delay": "0s",
+      "count": 20
+    }
+  ],
+  "animations": [
+    {
+      "name": "stats-carousel-scroll",
+      "duration": "600s",
+      "easing": "linear",
+      "iterations": "infinite",
+      "count": 1
+    }
+  ],
+  "keyframes": {
+    "pulse": "@keyframes pulse { \n  50% { opacity: 0.5; }\n}",
+    "spin": "@keyframes spin { \n  100% { transform: rotate(360deg); }\n}",
+    "stats-carousel-scroll": "@keyframes stats-carousel-scroll { \n  0% { transform: translate(0px); }\n  100% { transform: translate(-50%); }\n}",
+    "spark-haze-drift": "@keyframes spark-haze-drift { \n  0% { transform: translate(-6%, -4%) scale(1.02); }\n  50% { transform: translate(5%, 3%) scale(1.05); }\n  100% { transform: translate(-6%, -4%) scale(1.02); }\n}",
+    "spark-stars-drift": "@keyframes spark-stars-drift { \n  0% { background-position: 0px 0px, 0px 0px, 0px 0px; }\n  100% { background-position: 120% 120%, -120% 80%, 80% -120%; }\n}"
+  },
+  "stateRules": [
+    {
+      "selector": ".hover\\:-translate-y-1:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-translate-y": "-.25rem",
+        "transform": "translate(var(--tw-translate-x),var(--tw-translate-y))rotate(var(--tw-rotate))skewX(var(--tw-skew-x))skewY(var(--tw-skew-y))scaleX(var(--tw-scale-x))scaleY(var(--tw-scale-y))"
+      }
+    },
+    {
+      "selector": ".hover\\:scale-105:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-scale-x": "1.05",
+        "--tw-scale-y": "1.05",
+        "transform": "translate(var(--tw-translate-x),var(--tw-translate-y))rotate(var(--tw-rotate))skewX(var(--tw-skew-x))skewY(var(--tw-skew-y))scaleX(var(--tw-scale-x))scaleY(var(--tw-scale-y))"
+      }
+    },
+    {
+      "selector": ".hover\\:border-neutral-600:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-border-opacity": "1",
+        "border-top-color": "",
+        "border-right-color": "",
+        "border-bottom-color": "",
+        "border-left-color": ""
+      }
+    },
+    {
+      "selector": ".hover\\:border-neutral-700:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-border-opacity": "1",
+        "border-top-color": "",
+        "border-right-color": "",
+        "border-bottom-color": "",
+        "border-left-color": ""
+      }
+    },
+    {
+      "selector": ".hover\\:border-nvidia-green:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-border-opacity": "1",
+        "border-top-color": "",
+        "border-right-color": "",
+        "border-bottom-color": "",
+        "border-left-color": ""
+      }
+    },
+    {
+      "selector": ".hover\\:border-nvidia-green\\/50:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "border-top-color": "rgba(118, 185, 0, 0.5)",
+        "border-right-color": "rgba(118, 185, 0, 0.5)",
+        "border-bottom-color": "rgba(118, 185, 0, 0.5)",
+        "border-left-color": "rgba(118, 185, 0, 0.5)"
+      }
+    },
+    {
+      "selector": ".hover\\:border-red-500:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-border-opacity": "1",
+        "border-top-color": "",
+        "border-right-color": "",
+        "border-bottom-color": "",
+        "border-left-color": ""
+      }
+    },
+    {
+      "selector": ".hover\\:bg-black\\/30:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "background-color": "rgba(0, 0, 0, 0.3)"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-blue-500\\/30:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "background-color": "rgba(59, 130, 246, 0.3)"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-blue-600\\/30:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "background-color": "rgba(37, 99, 235, 0.3)"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-gray-50:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-bg-opacity": "1",
+        "background-color": "rgb(249 250 251/var(--tw-bg-opacity,1))"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-green-500:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-bg-opacity": "1",
+        "background-color": "rgb(34 197 94/var(--tw-bg-opacity,1))"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-neutral-200:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-bg-opacity": "1",
+        "background-color": "rgb(229 229 229/var(--tw-bg-opacity,1))"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-neutral-700:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-bg-opacity": "1",
+        "background-color": "rgb(64 64 64/var(--tw-bg-opacity,1))"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-neutral-800:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-bg-opacity": "1",
+        "background-color": "rgb(38 38 38/var(--tw-bg-opacity,1))"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-neutral-800\\/50:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "background-color": "rgba(38, 38, 38, 0.5)"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-nvidia-green\\/30:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "background-color": "rgba(118, 185, 0, 0.3)"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-nvidia-green\\/5:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "background-color": "rgba(118, 185, 0, 0.05)"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-nvidia-green\\/90:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "background-color": "rgba(118, 185, 0, 0.9)"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-orange-500\\/30:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "background-color": "rgba(249, 115, 22, 0.3)"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-purple-500\\/30:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "background-color": "rgba(168, 85, 247, 0.3)"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-red-500:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-bg-opacity": "1",
+        "background-color": "rgb(239 68 68/var(--tw-bg-opacity,1))"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-red-600\\/30:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "background-color": "rgba(220, 38, 38, 0.3)"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-red-600\\/80:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "background-color": "rgba(220, 38, 38, 0.8)"
+      }
+    },
+    {
+      "selector": ".hover\\:bg-white\\/20:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "background-color": "rgba(255, 255, 255, 0.2)"
+      }
+    },
+    {
+      "selector": ".hover\\:text-blue-300:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-text-opacity": "1",
+        "color": "rgb(147 197 253/var(--tw-text-opacity,1))"
+      }
+    },
+    {
+      "selector": ".hover\\:text-green-300:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-text-opacity": "1",
+        "color": "rgb(134 239 172/var(--tw-text-opacity,1))"
+      }
+    },
+    {
+      "selector": ".hover\\:text-neutral-300:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-text-opacity": "1",
+        "color": "rgb(212 212 212/var(--tw-text-opacity,1))"
+      }
+    },
+    {
+      "selector": ".hover\\:text-nvidia-green:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-text-opacity": "1",
+        "color": "rgb(118 185 0/var(--tw-text-opacity,1))"
+      }
+    },
+    {
+      "selector": ".hover\\:text-nvidia-green\\/80:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "color": "rgba(118, 185, 0, 0.8)"
+      }
+    },
+    {
+      "selector": ".hover\\:text-red-300:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-text-opacity": "1",
+        "color": "rgb(252 165 165/var(--tw-text-opacity,1))"
+      }
+    },
+    {
+      "selector": ".hover\\:text-white:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-text-opacity": "1",
+        "color": "rgb(255 255 255/var(--tw-text-opacity,1))"
+      }
+    },
+    {
+      "selector": ".hover\\:underline:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "text-decoration-line": "underline"
+      }
+    },
+    {
+      "selector": ".hover\\:opacity-60:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "opacity": "0.6"
+      }
+    },
+    {
+      "selector": ".hover\\:shadow-2xl:hover",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-shadow": "0 25px 50px -12px #00000040",
+        "--tw-shadow-colored": "0 25px 50px -12px var(--tw-shadow-color)",
+        "box-shadow": "var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)"
+      }
+    },
+    {
+      "selector": ".focus\\:border-nvidia-green:focus",
+      "states": [
+        "focus"
+      ],
+      "properties": {
+        "--tw-border-opacity": "1",
+        "border-top-color": "",
+        "border-right-color": "",
+        "border-bottom-color": "",
+        "border-left-color": ""
+      }
+    },
+    {
+      "selector": ".focus\\:border-nvidia-green\\/50:focus",
+      "states": [
+        "focus"
+      ],
+      "properties": {
+        "border-top-color": "rgba(118, 185, 0, 0.5)",
+        "border-right-color": "rgba(118, 185, 0, 0.5)",
+        "border-bottom-color": "rgba(118, 185, 0, 0.5)",
+        "border-left-color": "rgba(118, 185, 0, 0.5)"
+      }
+    },
+    {
+      "selector": ".focus\\:border-transparent:focus",
+      "states": [
+        "focus"
+      ],
+      "properties": {
+        "border-top-color": "rgba(0, 0, 0, 0)",
+        "border-right-color": "rgba(0, 0, 0, 0)",
+        "border-bottom-color": "rgba(0, 0, 0, 0)",
+        "border-left-color": "rgba(0, 0, 0, 0)"
+      }
+    },
+    {
+      "selector": ".focus\\:outline-none:focus",
+      "states": [
+        "focus"
+      ],
+      "properties": {
+        "outline-offset": "2px",
+        "outline-color": "rgba(0, 0, 0, 0)",
+        "outline-style": "solid",
+        "outline-width": "2px"
+      }
+    },
+    {
+      "selector": ".focus\\:ring-1:focus",
+      "states": [
+        "focus"
+      ],
+      "properties": {
+        "--tw-ring-offset-shadow": "var(--tw-ring-inset)0 0 0 var(--tw-ring-offset-width)var(--tw-ring-offset-color)",
+        "--tw-ring-shadow": "var(--tw-ring-inset)0 0 0 calc(1px + var(--tw-ring-offset-width))var(--tw-ring-color)",
+        "box-shadow": "var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow,0 0 #0000)"
+      }
+    },
+    {
+      "selector": ".focus\\:ring-2:focus",
+      "states": [
+        "focus"
+      ],
+      "properties": {
+        "--tw-ring-offset-shadow": "var(--tw-ring-inset)0 0 0 var(--tw-ring-offset-width)var(--tw-ring-offset-color)",
+        "--tw-ring-shadow": "var(--tw-ring-inset)0 0 0 calc(2px + var(--tw-ring-offset-width))var(--tw-ring-color)",
+        "box-shadow": "var(--tw-ring-offset-shadow),var(--tw-ring-shadow),var(--tw-shadow,0 0 #0000)"
+      }
+    },
+    {
+      "selector": ".focus\\:ring-nvidia-green:focus",
+      "states": [
+        "focus"
+      ],
+      "properties": {
+        "--tw-ring-opacity": "1",
+        "--tw-ring-color": "rgb(118 185 0/var(--tw-ring-opacity,1))"
+      }
+    },
+    {
+      "selector": ".focus\\:ring-nvidia-green\\/50:focus",
+      "states": [
+        "focus"
+      ],
+      "properties": {
+        "--tw-ring-color": "#76b90080"
+      }
+    },
+    {
+      "selector": ".focus\\:ring-primary:focus",
+      "states": [
+        "focus"
+      ],
+      "properties": {
+        "--tw-ring-color": "hsl(var(--primary))"
+      }
+    },
+    {
+      "selector": ".active\\:scale-95:active",
+      "states": [
+        "active"
+      ],
+      "properties": {
+        "--tw-scale-x": ".95",
+        "--tw-scale-y": ".95",
+        "transform": "translate(var(--tw-translate-x),var(--tw-translate-y))rotate(var(--tw-rotate))skewX(var(--tw-skew-x))skewY(var(--tw-skew-y))scaleX(var(--tw-scale-x))scaleY(var(--tw-scale-y))"
+      }
+    },
+    {
+      "selector": ".disabled\\:hover\\:scale-100:hover:disabled",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-scale-x": "1",
+        "--tw-scale-y": "1",
+        "transform": "translate(var(--tw-translate-x),var(--tw-translate-y))rotate(var(--tw-rotate))skewX(var(--tw-skew-x))skewY(var(--tw-skew-y))scaleX(var(--tw-scale-x))scaleY(var(--tw-scale-y))"
+      }
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-nvidia-green",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-text-opacity": "1",
+        "color": "rgb(118 185 0/var(--tw-text-opacity,1))"
+      }
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-nvidia-green\\/80",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "color": "rgba(118, 185, 0, 0.8)"
+      }
+    },
+    {
+      "selector": ".group:hover .group-hover\\:text-white",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-text-opacity": "1",
+        "color": "rgb(255 255 255/var(--tw-text-opacity,1))"
+      }
+    },
+    {
+      "selector": ".group:hover .group-hover\\:opacity-100",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "opacity": "1"
+      }
+    },
+    {
+      "selector": ".dark\\:hover\\:bg-gray-600:hover:is(.dark *)",
+      "states": [
+        "hover"
+      ],
+      "properties": {
+        "--tw-bg-opacity": "1",
+        "background-color": "rgb(75 85 99/var(--tw-bg-opacity,1))"
+      }
+    }
+  ],
+  "stateRuleCounts": {
+    "hover": 41,
+    "focus": 9,
+    "active": 1
+  },
+  "pseudo": [
+    {
+      "tag": "div",
+      "pseudo": "::before",
+      "content": "\"\"",
+      "transitionProperty": "all",
+      "transitionDuration": "0s",
+      "transitionTimingFunction": "ease",
+      "transitionDelay": "0s",
+      "animationName": "spark-haze-drift",
+      "animationDuration": "30s",
+      "animationTimingFunction": "ease-in-out",
+      "animationDelay": "0s",
+      "animationIterationCount": "infinite",
+      "transform": "matrix(1.03563, 0, 0, 1.03563, -5.41752, -11.6622)",
+      "willChange": "auto"
+    },
+    {
+      "tag": "div",
+      "pseudo": "::after",
+      "content": "\"\"",
+      "transitionProperty": "all",
+      "transitionDuration": "0s",
+      "transitionTimingFunction": "ease",
+      "transitionDelay": "0s",
+      "animationName": "spark-stars-drift",
+      "animationDuration": "80s",
+      "animationTimingFunction": "linear",
+      "animationDelay": "0s",
+      "animationIterationCount": "infinite",
+      "transform": "none",
+      "willChange": "auto"
+    }
+  ],
+  "easings": [
+    {
+      "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "count": 135
+    },
+    {
+      "value": "linear",
+      "count": 1
+    }
+  ],
+  "durations": [
+    {
+      "value": "0.15s",
+      "count": 135
+    },
+    {
+      "value": "600s",
+      "count": 1
+    }
+  ],
+  "transforms": [
+    {
+      "value": "matrix(1, 0, 0, 1, -1360.34, 0)",
+      "count": 1
+    }
+  ],
+  "filters": [],
+  "backdropFilters": [],
+  "willChange": [],
+  "runtime": [
+    {
+      "name": "spark-haze-drift",
+      "type": "CSSAnimation",
+      "duration": 30000,
+      "delay": 0,
+      "iterations": null,
+      "easing": "linear",
+      "playbackRate": null,
+      "hasKeyframes": true,
+      "viaWAAPI": false
+    },
+    {
+      "name": "spark-stars-drift",
+      "type": "CSSAnimation",
+      "duration": 80000,
+      "delay": 0,
+      "iterations": null,
+      "easing": "linear",
+      "playbackRate": null,
+      "hasKeyframes": true,
+      "viaWAAPI": false
+    },
+    {
+      "name": "stats-carousel-scroll",
+      "type": "CSSAnimation",
+      "duration": 600000,
+      "delay": 0,
+      "iterations": null,
+      "easing": "linear",
+      "playbackRate": null,
+      "hasKeyframes": true,
+      "viaWAAPI": false
+    }
+  ],
+  "canvases": [],
+  "meta": {
+    "sheetCount": 1,
+    "crossOriginSkipped": 0,
+    "cdpEventsCaptured": 3,
+    "cdpEventsUnique": 3,
+    "captureWindowMs": 4000
+  }
+}
