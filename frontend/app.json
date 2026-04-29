@@ -11,7 +11,8 @@
     ],
     "userInterfaceStyle": "dark",
     "android": {
-      "package": "com.licenta.digitalalchemist"
+      "package": "com.licenta.digitalalchemist",
+      "usesCleartextTraffic": true
     },
     "ios": {
       "bundleIdentifier": "com.licenta.digitalalchemist"

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { ReactNode, useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Platform, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   FadeInUp,
@@ -12,7 +12,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 
 import { sparkTheme } from '../../theme';
@@ -424,5 +424,371 @@ const stepStyles = StyleSheet.create({
   },
   textComplete: {
     color: sparkTheme.colors.textSecondary,
+  },
+});
+
+// ---------------------------------------------------------------------------
+// SparkLoadingSigil — multi-layer animated sacred-geometry sigil
+// ---------------------------------------------------------------------------
+
+const SIGIL_SIZE = 180;
+const SIGIL_C = SIGIL_SIZE / 2;
+const SIGIL_BRAND = sparkTheme.colors.brand;
+
+const STAR_PATH = (() => {
+  const outer = 26;
+  const inner = 11;
+  const segs: string[] = [];
+  for (let i = 0; i < 16; i++) {
+    const a = (i * Math.PI) / 8 - Math.PI / 2;
+    const r = i % 2 === 0 ? outer : inner;
+    const x = SIGIL_C + Math.cos(a) * r;
+    const y = SIGIL_C + Math.sin(a) * r;
+    segs.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(2)} ${y.toFixed(2)}`);
+  }
+  return `${segs.join(' ')} Z`;
+})();
+
+const HEXAGRAM_PATH = (() => {
+  const r = 50;
+  const tri = (rot: number) => {
+    const pts: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const a = (i * 2 * Math.PI) / 3 + rot - Math.PI / 2;
+      pts.push(
+        `${(SIGIL_C + Math.cos(a) * r).toFixed(2)} ${(SIGIL_C + Math.sin(a) * r).toFixed(2)}`,
+      );
+    }
+    return `M${pts[0]} L${pts[1]} L${pts[2]} Z`;
+  };
+  return `${tri(0)} ${tri(Math.PI / 3)}`;
+})();
+
+const PARTICLES = [
+  { angle: 0, radius: 70, duration: 8000, dir: 1, size: 3, op: 0.9 },
+  { angle: 30, radius: 78, duration: 11000, dir: -1, size: 2, op: 0.7 },
+  { angle: 70, radius: 68, duration: 9500, dir: 1, size: 3, op: 0.8 },
+  { angle: 110, radius: 80, duration: 13000, dir: 1, size: 2, op: 0.6 },
+  { angle: 145, radius: 72, duration: 10000, dir: -1, size: 4, op: 0.95 },
+  { angle: 180, radius: 76, duration: 12000, dir: 1, size: 2, op: 0.7 },
+  { angle: 210, radius: 70, duration: 8500, dir: -1, size: 3, op: 0.85 },
+  { angle: 250, radius: 82, duration: 14000, dir: 1, size: 2, op: 0.55 },
+  { angle: 285, radius: 74, duration: 9000, dir: -1, size: 3, op: 0.8 },
+  { angle: 315, radius: 78, duration: 11500, dir: 1, size: 2, op: 0.7 },
+  { angle: 340, radius: 68, duration: 7500, dir: -1, size: 3, op: 0.9 },
+  { angle: 50, radius: 84, duration: 15000, dir: 1, size: 2, op: 0.5 },
+] as const;
+
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((v) => {
+      if (mounted) setReduced(v);
+    });
+    const sub = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      setReduced,
+    );
+    return () => {
+      mounted = false;
+      sub.remove();
+    };
+  }, []);
+  return reduced;
+}
+
+function RotatingGroup({
+  children,
+  duration,
+  direction,
+  reduced,
+}: {
+  children: ReactNode;
+  duration: number;
+  direction: 1 | -1;
+  reduced: boolean;
+}) {
+  const rot = useSharedValue(0);
+  useEffect(() => {
+    if (reduced) return;
+    rot.value = withRepeat(
+      withTiming(direction * 360, { duration, easing: Easing.linear }),
+      -1,
+      false,
+    );
+  }, [duration, direction, reduced, rot]);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rot.value}deg` }],
+  }));
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, sigilStyles.layer, style]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+function SigilParticle({
+  angle,
+  radius,
+  duration,
+  direction,
+  size,
+  opacity,
+  reduced,
+}: {
+  angle: number;
+  radius: number;
+  duration: number;
+  direction: 1 | -1;
+  size: number;
+  opacity: number;
+  reduced: boolean;
+}) {
+  const rot = useSharedValue(angle);
+  useEffect(() => {
+    if (reduced) return;
+    rot.value = withRepeat(
+      withTiming(angle + direction * 360, {
+        duration,
+        easing: Easing.linear,
+      }),
+      -1,
+      false,
+    );
+  }, [angle, duration, direction, reduced, rot]);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rot.value}deg` }],
+  }));
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, style]}
+    >
+      <View
+        style={{
+          position: 'absolute',
+          top: SIGIL_C - radius - size / 2,
+          left: SIGIL_C - size / 2,
+          width: size,
+          height: size,
+          borderRadius: size,
+          backgroundColor: SIGIL_BRAND,
+          opacity,
+        }}
+      />
+    </Animated.View>
+  );
+}
+
+export function SparkLoadingSigil() {
+  const reduced = useReducedMotion();
+
+  const coreScale = useSharedValue(1);
+  const haloScale = useSharedValue(1);
+  const haloOpacity = useSharedValue(0.7);
+  const glitch = useSharedValue(0);
+
+  useEffect(() => {
+    if (reduced) return;
+    coreScale.value = withRepeat(
+      withSequence(
+        withTiming(1.08, { duration: 1100, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.96, { duration: 1100, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+      true,
+    );
+    haloScale.value = withRepeat(
+      withSequence(
+        withTiming(1.18, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.92, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+      true,
+    );
+    haloOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.45, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.9, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+      true,
+    );
+  }, [reduced, coreScale, haloScale, haloOpacity]);
+
+  useEffect(() => {
+    if (reduced) return;
+    const trigger = () => {
+      glitch.value = withSequence(
+        withTiming(1, { duration: 60 }),
+        withTiming(0, { duration: 100 }),
+        withDelay(80, withTiming(0.7, { duration: 50 })),
+        withTiming(0, { duration: 90 }),
+      );
+    };
+    trigger();
+    const id = setInterval(trigger, 4200);
+    return () => clearInterval(id);
+  }, [reduced, glitch]);
+
+  const coreStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: coreScale.value }],
+  }));
+  const haloStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: haloScale.value }],
+    opacity: haloOpacity.value,
+  }));
+  const ghostAStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: coreScale.value },
+      { translateX: 1.4 + glitch.value * 3 },
+    ],
+    opacity: 0.4 + glitch.value * 0.5,
+  }));
+  const ghostBStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: coreScale.value },
+      { translateX: -(1.4 + glitch.value * 3) },
+    ],
+    opacity: 0.4 + glitch.value * 0.5,
+  }));
+
+  return (
+    <View style={sigilStyles.container} pointerEvents="none">
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, sigilStyles.layer, haloStyle]}
+      >
+        <Svg width={SIGIL_SIZE} height={SIGIL_SIZE}>
+          <Defs>
+            <RadialGradient id="sigilHalo" cx="50%" cy="50%" r="50%">
+              <Stop offset="0%" stopColor={SIGIL_BRAND} stopOpacity="0.55" />
+              <Stop offset="40%" stopColor={SIGIL_BRAND} stopOpacity="0.2" />
+              <Stop offset="100%" stopColor={SIGIL_BRAND} stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          <Circle
+            cx={SIGIL_C}
+            cy={SIGIL_C}
+            r={SIGIL_C}
+            fill="url(#sigilHalo)"
+          />
+        </Svg>
+      </Animated.View>
+
+      <RotatingGroup duration={18000} direction={-1} reduced={reduced}>
+        <Svg width={SIGIL_SIZE} height={SIGIL_SIZE}>
+          <Circle
+            cx={SIGIL_C}
+            cy={SIGIL_C}
+            r={86}
+            stroke={SIGIL_BRAND}
+            strokeWidth={1}
+            strokeDasharray="2 6"
+            fill="none"
+            opacity={0.55}
+          />
+          {Array.from({ length: 12 }).map((_, i) => {
+            const a = (i * Math.PI) / 6 - Math.PI / 2;
+            const r1 = 78;
+            const r2 = 84;
+            return (
+              <Path
+                key={i}
+                d={`M${SIGIL_C + Math.cos(a) * r1} ${SIGIL_C + Math.sin(a) * r1} L${SIGIL_C + Math.cos(a) * r2} ${SIGIL_C + Math.sin(a) * r2}`}
+                stroke={SIGIL_BRAND}
+                strokeWidth={1}
+                opacity={0.7}
+              />
+            );
+          })}
+        </Svg>
+      </RotatingGroup>
+
+      <RotatingGroup duration={11000} direction={1} reduced={reduced}>
+        <Svg width={SIGIL_SIZE} height={SIGIL_SIZE}>
+          <Path
+            d={HEXAGRAM_PATH}
+            stroke={SIGIL_BRAND}
+            strokeWidth={1.2}
+            fill="none"
+            opacity={0.4}
+            strokeLinejoin="round"
+          />
+        </Svg>
+      </RotatingGroup>
+
+      <RotatingGroup duration={6500} direction={-1} reduced={reduced}>
+        <Svg width={SIGIL_SIZE} height={SIGIL_SIZE}>
+          <Circle
+            cx={SIGIL_C}
+            cy={SIGIL_C}
+            r={36}
+            stroke={SIGIL_BRAND}
+            strokeWidth={1}
+            strokeDasharray="3 4"
+            fill="none"
+            opacity={0.7}
+          />
+        </Svg>
+      </RotatingGroup>
+
+      {!reduced &&
+        PARTICLES.map((p, i) => (
+          <SigilParticle
+            key={i}
+            angle={p.angle}
+            radius={p.radius}
+            duration={p.duration}
+            direction={p.dir as 1 | -1}
+            size={p.size}
+            opacity={p.op}
+            reduced={reduced}
+          />
+        ))}
+
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, sigilStyles.layer, ghostAStyle]}
+      >
+        <Svg width={SIGIL_SIZE} height={SIGIL_SIZE}>
+          <Path d={STAR_PATH} fill={SIGIL_BRAND} />
+        </Svg>
+      </Animated.View>
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, sigilStyles.layer, ghostBStyle]}
+      >
+        <Svg width={SIGIL_SIZE} height={SIGIL_SIZE}>
+          <Path d={STAR_PATH} fill={SIGIL_BRAND} />
+        </Svg>
+      </Animated.View>
+
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, sigilStyles.layer, coreStyle]}
+      >
+        <Svg width={SIGIL_SIZE} height={SIGIL_SIZE}>
+          <Path d={STAR_PATH} fill={SIGIL_BRAND} />
+        </Svg>
+      </Animated.View>
+    </View>
+  );
+}
+
+const sigilStyles = StyleSheet.create({
+  container: {
+    width: SIGIL_SIZE,
+    height: SIGIL_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  layer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

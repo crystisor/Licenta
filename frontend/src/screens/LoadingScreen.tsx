@@ -4,8 +4,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  SparkLoadingOrb,
   SparkLoadingProgressBar,
+  SparkLoadingSigil,
   SparkLoadingSteps,
 } from '../components/spark/SparkLoadingAnimations';
 import { SparkAmbient } from '../components/spark/SparkAmbient';
@@ -65,7 +65,7 @@ export function LoadingScreen({ debugPanel }: LoadingScreenProps) {
             </Text>
           </View>
 
-          <SparkLoadingOrb glyph="AL" />
+          <SparkLoadingSigil />
 
           <View style={styles.panel}>
             <SparkLoadingProgressBar progress={progress} />
